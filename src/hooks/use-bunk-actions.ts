@@ -1,7 +1,10 @@
 import { useAttendanceUIStore } from "@/stores/attendance-ui-store";
 import { useBunkStore } from "@/stores/bunk-store";
 import type { AttendanceRecord, BunkRecord } from "@/types";
-import { buildRecordKey, parseTimeSlot } from "@/utils/attendance-helpers";
+import {
+  parseTimeSlot,
+  recordsReferToSameSession,
+} from "@/utils/attendance-helpers";
 import * as Haptics from "expo-haptics";
 import { useCallback } from "react";
 
@@ -24,11 +27,8 @@ export const useBunkActions = () => {
     (courseId: string, record: AttendanceRecord): BunkRecord | null => {
       const course = bunkCourses.find((c) => c.courseId === courseId);
       if (!course) return null;
-      const recordKey = buildRecordKey(record.date, record.description);
       return (
-        course.bunks.find(
-          (b) => buildRecordKey(b.date, b.description) === recordKey,
-        ) || null
+        course.bunks.find((b) => recordsReferToSameSession(b, record)) || null
       );
     },
     [bunkCourses],

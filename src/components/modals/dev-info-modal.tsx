@@ -1,5 +1,6 @@
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { Feather } from "@expo/vector-icons";
 import { Ionicons } from "@expo/vector-icons";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
@@ -54,6 +55,7 @@ export const DevInfoModal = ({ visible, onClose }: DevInfoModalProps) => {
   // Show update section if we have any OTA update info
   const hasUpdateInfo = updateId && Constants.appOwnership !== "expo";
   const buyMeCoffeeUrl = "upi://pay?pa=noelmcv7@oksbi&cu=INR";
+  const githubRepoUrl = "https://github.com/Noelithub77/bunkialo2";
   const linkColor = isDark ? "#60A5FA" : "#2563EB";
 
   const openUrl = (url: string) => {
@@ -185,18 +187,40 @@ export const DevInfoModal = ({ visible, onClose }: DevInfoModalProps) => {
                 </Text>
               </Text>
 
-              <Pressable
-                onPress={() => openUrl(buyMeCoffeeUrl)}
-                className="mt-1 w-full rounded-xl px-3 py-2"
-                style={{ backgroundColor: Colors.status.warning }}
-              >
-                <View className="flex-row items-center justify-center gap-1.5">
-                  <Ionicons name="cafe-outline" size={14} color={Colors.black} />
-                  <Text className={`${isCompactMobile ? "text-[11px]" : "text-[12px]"} font-semibold`} style={{ color: Colors.black }}>
-                    Buy me a coffee
-                  </Text>
-                </View>
-              </Pressable>
+              <View className="mt-1 flex-row gap-2">
+                <Pressable
+                  onPress={() => openUrl(buyMeCoffeeUrl)}
+                  className="flex-1 rounded-xl px-2.5 py-2"
+                  style={{ backgroundColor: Colors.status.warning }}
+                >
+                  <View className="flex-row items-center justify-center gap-1.5">
+                    <Ionicons name="cafe-outline" size={14} color={Colors.black} />
+                    <Text
+                      className={`${isCompactMobile ? "text-[10px]" : "text-[11px]"} font-semibold`}
+                      style={{ color: Colors.black }}
+                    >
+                      Buy me a coffee
+                    </Text>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => openUrl(githubRepoUrl)}
+                  className="flex-1 rounded-xl px-2.5 py-2"
+                  style={{ backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1 }}
+                >
+                  <View className="flex-row items-center justify-center gap-1.5">
+                    <Ionicons name="star" size={14} color="#FACC15" />
+                    <Text
+                      className={`${isCompactMobile ? "text-[10px]" : "text-[11px]"} font-semibold`}
+                      style={{ color: theme.text }}
+                    >
+                      Star on GitHub
+                    </Text>
+                    <Feather name="arrow-up-right" size={12} color={theme.textSecondary} />
+                  </View>
+                </Pressable>
+              </View>
             </View>
           </View>
         </Pressable>

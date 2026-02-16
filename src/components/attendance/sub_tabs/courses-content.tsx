@@ -13,6 +13,7 @@ import {
   useBunkStore,
 } from "@/stores/bunk-store";
 import type { AttendanceRecord, CourseAttendance, CourseBunkData } from "@/types";
+import { getRecordKeyVariants } from "@/utils/attendance-helpers";
 import { useCallback, useMemo } from "react";
 import { ActivityIndicator, FlatList, RefreshControl, Text, View } from "react-native";
 import { AddBunkModal } from "../add-bunk-modal";
@@ -58,9 +59,6 @@ const parseDateString = (
   return { date: `${year}-${month}-${day.padStart(2, "0")}`, time };
 };
 
-const buildRecordKey = (record: AttendanceRecord): string =>
-  `${record.date.trim()}-${record.description.trim()}`;
-
 const filterPastRecords = (records: AttendanceRecord[]): AttendanceRecord[] => {
   const now = new Date();
   return records.filter((record) => {
@@ -88,12 +86,16 @@ const getEffectiveCoursePercentage = (
   const bunkKeys = new Set<string>();
   if (bunkData) {
     for (const bunk of bunkData.bunks) {
-      bunkKeys.add(`${bunk.date.trim()}-${bunk.description.trim()}`);
+      for (const key of getRecordKeyVariants(bunk)) {
+        bunkKeys.add(key);
+      }
     }
   }
 
   const displayRecords = pastRecords.filter(
-    (record) => record.status !== "Unknown" || !bunkKeys.has(buildRecordKey(record)),
+    (record) =>
+      record.status !== "Unknown" ||
+      !getRecordKeyVariants(record).some((key) => bunkKeys.has(key)),
   );
   const confirmedPresentCount = pastRecords.filter(
     (record) => record.status === "Present",

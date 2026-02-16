@@ -13,6 +13,11 @@ import type {
 } from "@/types";
 import { getRandomCourseColor } from "@/utils/course-color";
 import { extractCourseCode, extractCourseName } from "@/utils/course-name";
+import {
+  getCanonicalRecordDescription,
+  getRecordKeyVariants,
+  recordsReferToSameSession,
+} from "@/utils/attendance-helpers";
 import { evaluateCoursesAgainstCurrentSemester } from "@/utils/semester-course-filter";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -129,9 +134,6 @@ const getSessionEndDateTime = (
   return endDate;
 };
 
-const buildBunkKey = (date: string, description: string): string =>
-  `${date.trim()}-${description.trim()}`;
-
 // check if session end time is in the past (or exactly now)
 const isPastOrCompleted = (dateStr: string): boolean => {
   const parsed = parseDateString(dateStr);
@@ -199,7 +201,7 @@ export const useBunkStore = create<BunkStoreState & BunkActions>()(
               .map((r) => ({
                 id: generateId(),
                 date: r.date,
-                description: r.date,
+                description: getCanonicalRecordDescription(r),
                 timeSlot: parseTimeSlot(r.date),
                 note: "",
                 source: "lms" as const,
@@ -211,28 +213,33 @@ export const useBunkStore = create<BunkStoreState & BunkActions>()(
 
             if (existing) {
               // merge: keep user bunks, update LMS bunks, preserve notes/DL status
-              const lmsKeys = new Set(
-                lmsBunks.map((b) => buildBunkKey(b.date, b.description)),
-              );
+              const lmsKeys = new Set<string>();
+              for (const bunk of lmsBunks) {
+                for (const key of getRecordKeyVariants(bunk)) {
+                  lmsKeys.add(key);
+                }
+              }
               const userBunks = existing.bunks.filter(
-                (b) =>
-                  b.source === "user" &&
-                  !lmsKeys.has(buildBunkKey(b.date, b.description)),
+                (b) => {
+                  if (b.source !== "user") return false;
+                  return !getRecordKeyVariants(b).some((key) =>
+                    lmsKeys.has(key),
+                  );
+                },
               );
 
               const mergedLmsBunks = lmsBunks.map((newBunk) => {
-                const bunkKey = buildBunkKey(newBunk.date, newBunk.description);
                 // find matching existing bunk by date+description
                 const oldBunk =
                   existing.bunks.find(
                     (b) =>
                       b.source === "lms" &&
-                      buildBunkKey(b.date, b.description) === bunkKey,
+                      recordsReferToSameSession(b, newBunk),
                   ) ||
                   existing.bunks.find(
                     (b) =>
                       b.source === "user" &&
-                      buildBunkKey(b.date, b.description) === bunkKey,
+                      recordsReferToSameSession(b, newBunk),
                   );
                 if (oldBunk) {
                   return {
@@ -357,7 +364,7 @@ export const useBunkStore = create<BunkStoreState & BunkActions>()(
               .map((r) => ({
                 id: generateId(),
                 date: r.date,
-                description: r.date,
+                description: getCanonicalRecordDescription(r),
                 timeSlot: parseTimeSlot(r.date),
                 note: "",
                 source: "lms" as const,

@@ -8,11 +8,12 @@ import { filterPastBunks, selectCourseStats } from "@/stores/bunk-store";
 import type {
     AttendanceRecord,
     AttendanceStatus,
+    BunkRecord,
     CourseAttendance,
     CourseBunkData,
     MarkedDates,
-    SessionType,
 } from "@/types";
+import { getRecordKeyVariants } from "@/utils/attendance-helpers";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useMemo, useState } from "react";
@@ -38,35 +39,55 @@ interface UnifiedCourseCardProps {
 const getPercentageColor = (percentage: number) =>
   percentage >= 80 ? Colors.status.success : Colors.status.danger;
 
-// parse time slot and return duration in hours
-const parseDurationInHours = (timeSlot: string | null): number => {
-  if (!timeSlot) return 0;
-  const timeMatch = timeSlot.match(
-    /(\d{1,2})(?::(\d{2}))?(AM|PM)\s*-\s*(\d{1,2})(?::(\d{2}))?(AM|PM)/i,
-  );
-  if (!timeMatch) return 0;
-
-  const [, startHour, startMin, startMeridiem, endHour, endMin, endMeridiem] =
-    timeMatch;
-  const startHours24 =
-    (parseInt(startHour) % 12) +
-    (startMeridiem.toUpperCase() === "PM" ? 12 : 0);
-  const endHours24 =
-    (parseInt(endHour) % 12) + (endMeridiem.toUpperCase() === "PM" ? 12 : 0);
-  const startMinutes = startHours24 * 60 + (startMin ? parseInt(startMin) : 0);
-  const endMinutes = endHours24 * 60 + (endMin ? parseInt(endMin) : 0);
-  return (endMinutes - startMinutes) / 60;
+const MONTH_TO_NUMBER: Record<string, string> = {
+  jan: "01",
+  feb: "02",
+  mar: "03",
+  apr: "04",
+  may: "05",
+  jun: "06",
+  jul: "07",
+  aug: "08",
+  sep: "09",
+  oct: "10",
+  nov: "11",
+  dec: "12",
 };
 
-const getSessionType = (desc: string, dateStr: string): SessionType => {
-  const lower = desc.toLowerCase();
-  if (lower.includes("tutorial")) return "tutorial";
+type DayKey = string;
 
-  const { time } = parseDateString(dateStr);
-  if (parseDurationInHours(time) >= 2) return "lab";
-  if (lower.includes("lab")) return "lab";
+const toDayKey = (raw: string, fallbackYear: number = new Date().getFullYear()): DayKey | null => {
+  const cleaned = raw.trim();
+  if (!cleaned) return null;
 
-  return "regular";
+  const isoMatch = cleaned.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return `${year}-${month}-${day}`;
+  }
+
+  const dayMonthYearMatch = cleaned.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
+  if (dayMonthYearMatch) {
+    const [, day, monthRaw, year] = dayMonthYearMatch;
+    const month = MONTH_TO_NUMBER[monthRaw.toLowerCase()];
+    if (!month) return null;
+    return `${year}-${month}-${day.padStart(2, "0")}`;
+  }
+
+  const dayMonthMatch = cleaned.match(/(\d{1,2})\s+([A-Za-z]{3})\b/);
+  if (dayMonthMatch) {
+    const [, day, monthRaw] = dayMonthMatch;
+    const month = MONTH_TO_NUMBER[monthRaw.toLowerCase()];
+    if (!month) return null;
+    return `${fallbackYear}-${month}-${day.padStart(2, "0")}`;
+  }
+
+  const date = new Date(cleaned);
+  if (Number.isNaN(date.getTime())) return null;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 // parse "Thu 1 Jan 2026 11AM - 12PM" -> { date: "2026-01-01", time: "11AM - 12PM" }
@@ -83,28 +104,15 @@ const parseDateString = (
   if (!dateMatch) return { date: null, time };
 
   const [, day, monthStr, year] = dateMatch;
-  const months: Record<string, string> = {
-    jan: "01",
-    feb: "02",
-    mar: "03",
-    apr: "04",
-    may: "05",
-    jun: "06",
-    jul: "07",
-    aug: "08",
-    sep: "09",
-    oct: "10",
-    nov: "11",
-    dec: "12",
-  };
-  const month = months[monthStr.toLowerCase()];
+  const month = MONTH_TO_NUMBER[monthStr.toLowerCase()];
   if (!month) return { date: null, time };
 
   return { date: `${year}-${month}-${day.padStart(2, "0")}`, time };
 };
 
-const buildRecordKey = (record: AttendanceRecord): string =>
-  `${record.date.trim()}-${record.description.trim()}`;
+const parseBunkDateKey = (dateStr: string): string | null => {
+  return toDayKey(dateStr);
+};
 
 // filter records up to current time only
 const filterPastRecords = (records: AttendanceRecord[]): AttendanceRecord[] => {
@@ -136,53 +144,70 @@ const getStatusColor = (status: AttendanceStatus): string => {
   }
 };
 
-// only show confirmed absences on calendar
+// calendar marks absence dates (red dots), list filtering remains DL-only
 const buildMarkedDates = (
   records: AttendanceRecord[],
+  bunks: BunkRecord[],
   selectedDate: string | null,
 ): MarkedDates => {
   const marked: MarkedDates = {};
+  const dutyLeaveDays = new Set<string>();
+
+  for (const bunk of bunks) {
+    if (!bunk.isDutyLeave) continue;
+    const date = parseBunkDateKey(bunk.date);
+    if (!date) continue;
+    dutyLeaveDays.add(date);
+  }
+
+  const pushDot = (date: string, color: string) => {
+    const existing = marked[date] ?? { dots: [] };
+    marked[date] = {
+      ...existing,
+      dots: [{ key: `${date}-${color}`, color }],
+    };
+  };
 
   for (const record of records) {
-    // skip non-absence statuses
     if (
       record.status === "Unknown" ||
       record.status === "Present" ||
       record.status === "Late" ||
       record.status === "Excused"
-    )
+    ) {
       continue;
-
-    const { date } = parseDateString(record.date);
-    if (!date) continue;
-
-    const color = getStatusColor(record.status);
-    const sessionType = getSessionType(record.description, record.date);
-
-    if (!marked[date]) {
-      marked[date] = { dots: [] };
     }
-    marked[date].dots.push({
-      key: `${sessionType}-${record.status}-${marked[date].dots.length}`,
-      color,
-    });
+
+    const date = toDayKey(record.date);
+    if (!date) continue;
+    if (dutyLeaveDays.has(date)) continue;
+
+    pushDot(date, getStatusColor(record.status));
+  }
+
+  for (const date of dutyLeaveDays) {
+    // If a day has DL, show blue only for that day.
+    pushDot(date, Colors.status.info);
   }
 
   // mark selected date
-  if (selectedDate && marked[selectedDate]) {
-    marked[selectedDate] = { ...marked[selectedDate], selected: true };
+  if (selectedDate) {
+    const existing = marked[selectedDate] ?? { dots: [] };
+    marked[selectedDate] = {
+      ...existing,
+      selected: true,
+    };
   }
 
   return marked;
 };
 
 const getMostRecentDate = (records: AttendanceRecord[]): string | null => {
-  // get most recent confirmed Absent date
-  const filtered = records.filter((r) => r.status === "Absent");
+  const filtered = records.filter((record) => record.status === "Absent");
   let mostRecent: string | null = null;
   let mostRecentTime = 0;
   for (const record of filtered) {
-    const { date } = parseDateString(record.date);
+    const date = toDayKey(record.date);
     if (!date) continue;
     const time = new Date(date).getTime();
     if (time > mostRecentTime) {
@@ -237,7 +262,9 @@ export function UnifiedCourseCard({
     const keys = new Set<string>();
     if (!bunkData) return keys;
     for (const bunk of bunkData.bunks) {
-      keys.add(`${bunk.date.trim()}-${bunk.description.trim()}`);
+      for (const key of getRecordKeyVariants(bunk)) {
+        keys.add(key);
+      }
     }
     return keys;
   }, [bunkData]);
@@ -246,7 +273,8 @@ export function UnifiedCourseCard({
     () =>
       pastRecords.filter(
         (record) =>
-          record.status !== "Unknown" || !bunkKeys.has(buildRecordKey(record)),
+          record.status !== "Unknown" ||
+          !getRecordKeyVariants(record).some((key) => bunkKeys.has(key)),
       ),
     [pastRecords, bunkKeys],
   );
@@ -265,15 +293,42 @@ export function UnifiedCourseCard({
         : 0,
     [bunkData],
   );
-  // unknown ("?") defaults to present unless user explicitly confirms absent
-  const attended = confirmedPresentCount + unknownCount + correctedPresentCount;
+  const dutyLeaveCount = useMemo(
+    () =>
+      bunkData
+        ? filterPastBunks(bunkData.bunks).filter((bunk) => bunk.isDutyLeave)
+            .length
+        : 0,
+    [bunkData],
+  );
+  // Unknown ("?") defaults to present; DL and present corrections are treated as attended.
+  const attended =
+    confirmedPresentCount + unknownCount + correctedPresentCount + dutyLeaveCount;
   const percentage =
     totalSessions > 0 ? Math.round((attended / totalSessions) * 100) : 0;
   const percentageColor = getPercentageColor(percentage);
 
   // bunk stats
   const stats = bunkData ? selectCourseStats(bunkData) : null;
-  const pastBunks = bunkData ? filterPastBunks(bunkData.bunks) : [];
+  const pastBunks = useMemo(
+    () => (bunkData ? filterPastBunks(bunkData.bunks) : []),
+    [bunkData],
+  );
+  const bunksByDay = useMemo(() => {
+    const byDay = new Map<DayKey, BunkRecord[]>();
+    for (const bunk of pastBunks) {
+      const dayKey = parseBunkDateKey(bunk.date);
+      if (!dayKey) continue;
+      const existing = byDay.get(dayKey) ?? [];
+      existing.push(bunk);
+      byDay.set(dayKey, existing);
+    }
+    return byDay;
+  }, [pastBunks]);
+  const displayedBunks = useMemo(() => {
+    if (!selectedDate) return pastBunks;
+    return bunksByDay.get(selectedDate) ?? [];
+  }, [bunksByDay, pastBunks, selectedDate]);
 
   // bunks display
   const bunksDisplay = showTotal
@@ -288,10 +343,10 @@ export function UnifiedCourseCard({
         ? Colors.status.warning
         : Colors.status.success;
 
-  // calendar data - only Absent and Unknown
+  // calendar data - duty leave dates only
   const markedDates = useMemo(
-    () => buildMarkedDates(displayRecords, selectedDate),
-    [displayRecords, selectedDate],
+    () => buildMarkedDates(displayRecords, pastBunks, selectedDate),
+    [displayRecords, pastBunks, selectedDate],
   );
   const initialDate = useMemo(
     () => getMostRecentDate(displayRecords),
@@ -567,9 +622,9 @@ export function UnifiedCourseCard({
             }}
           />
 
-          {pastBunks.length > 0 && (
+          {displayedBunks.length > 0 && (
             <View className="mt-2 gap-0">
-              {pastBunks.map((bunk) => (
+              {displayedBunks.map((bunk) => (
                 <SwipeableBunkItem
                   key={bunk.id}
                   bunk={bunk}
@@ -582,6 +637,15 @@ export function UnifiedCourseCard({
                 />
               ))}
             </View>
+          )}
+
+          {selectedDate && displayedBunks.length === 0 && (
+            <Text
+              className="mt-2 text-[12px] text-center"
+              style={{ color: theme.textSecondary }}
+            >
+              No bunks on selected date
+            </Text>
           )}
 
           <View className="mt-4 flex-row gap-2">
@@ -601,12 +665,14 @@ export function UnifiedCourseCard({
             </Pressable>
           </View>
 
-          {pastBunks.length > 0 && (
+          {displayedBunks.length > 0 && (
             <Text
               className="mt-2 text-[10px] text-center opacity-60"
               style={{ color: theme.textSecondary }}
             >
-              Swipe left = Present · Swipe right = DL
+              {selectedDate
+                ? "Showing bunks for selected date"
+                : "Swipe left = Present · Swipe right = DL"}
             </Text>
           )}
 
@@ -621,6 +687,18 @@ export function UnifiedCourseCard({
                 style={{ color: theme.textSecondary }}
               >
                 A
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-1">
+              <View
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: Colors.status.info }}
+              />
+              <Text
+                className="text-[10px]"
+                style={{ color: theme.textSecondary }}
+              >
+                DL
               </Text>
             </View>
           </View>

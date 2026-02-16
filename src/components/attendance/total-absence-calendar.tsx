@@ -4,6 +4,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAttendanceStore } from "@/stores/attendance-store";
 import { useBunkStore } from "@/stores/bunk-store";
 import type { AttendanceRecord, MarkedDates } from "@/types";
+import { recordsReferToSameSession } from "@/utils/attendance-helpers";
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { Text, View } from "react-native";
@@ -56,9 +57,6 @@ const parseDateString = (
   return { date: `${year}-${month}-${day.padStart(2, "0")}`, time };
 };
 
-const buildRecordKey = (date: string, description: string): string =>
-  `${date.trim()}-${description.trim()}`;
-
 interface TotalAbsenceCalendarProps {
   onMarkPresent?: (courseId: string, record: AttendanceRecord) => void;
   onMarkDL?: (courseId: string, record: AttendanceRecord) => void;
@@ -99,9 +97,8 @@ export function TotalAbsenceCalendar({
       for (const record of course.records) {
         // confirmed absences only
         if (record.status !== "Absent" && record.status !== "Unknown") continue;
-        const recordKey = buildRecordKey(record.date, record.description);
         const matchingBunk = bunkCourse?.bunks.find(
-          (b) => buildRecordKey(b.date, b.description) === recordKey,
+          (b) => recordsReferToSameSession(b, record),
         );
         // Unknown is assumed present unless user explicitly marked it
         if (record.status === "Unknown" && (!matchingBunk || matchingBunk.isMarkedPresent)) {

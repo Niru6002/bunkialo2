@@ -6,6 +6,10 @@ import type {
   CourseAttendance,
   CourseBunkData,
 } from "@/types";
+import {
+  buildRecordKey,
+  getRecordKeyVariants,
+} from "@/utils/attendance-helpers";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Modal, Pressable, Text, View } from "react-native";
@@ -50,9 +54,6 @@ const parseTime = (dateStr: string): string | null => {
   );
   return timeMatch ? timeMatch[1] : null;
 };
-
-const buildRecordKey = (date: string, description: string): string =>
-  `${date.trim()}-${description.trim()}`;
 
 // filter past records
 const filterPast = (records: AttendanceRecord[]): AttendanceRecord[] => {
@@ -109,7 +110,9 @@ export function UnknownStatusModal({
     for (const course of bunkCourses) {
       const courseMap = new Map<string, BunkRecord>();
       for (const bunk of course.bunks) {
-        courseMap.set(buildRecordKey(bunk.date, bunk.description), bunk);
+        for (const key of getRecordKeyVariants(bunk)) {
+          courseMap.set(key, bunk);
+        }
       }
       map.set(course.courseId, courseMap);
     }
@@ -131,8 +134,9 @@ export function UnknownStatusModal({
       const pastRecords = filterPast(course.records);
       for (const record of pastRecords) {
         if (record.status === "Unknown") {
-          const recordKey = buildRecordKey(record.date, record.description);
-          const matchingBunk = bunkLookup.get(course.courseId)?.get(recordKey);
+          const matchingBunk = getRecordKeyVariants(record)
+            .map((key) => bunkLookup.get(course.courseId)?.get(key))
+            .find((value): value is BunkRecord => value !== undefined);
           let resolution: UnknownResolution = "assumedPresent";
           let note = "";
           if (matchingBunk) {
