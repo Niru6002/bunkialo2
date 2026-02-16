@@ -1,16 +1,10 @@
 "use client";
 
-import { ArrowUpRight, QrCode } from "lucide-react";
+import { ArrowUpRight, QrCode, Star } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import {
-  SiAndroid,
-  SiApple,
-  SiExpo,
-  SiGithub,
-  SiGoogleplay,
-} from "react-icons/si";
+import { SiAndroid, SiApple, SiExpo, SiGoogleplay } from "react-icons/si";
 
 import { AnimatedLogo } from "@/components/landing/animated-logo";
 import { LandingSplash } from "@/components/landing/landing-splash";
@@ -270,7 +264,7 @@ export function LandingShell({ expUrl, initialTab, qrUrl }: LandingShellProps) {
             </Tabs>
 
             <motion.div
-              className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 sm:px-3.5"
+              className="flex items-center justify-between gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 sm:px-3.5"
               initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{
@@ -278,20 +272,31 @@ export function LandingShell({ expUrl, initialTab, qrUrl }: LandingShellProps) {
                 duration: 0.35,
               }}
             >
-              <p className="min-w-0 text-[11px] leading-relaxed text-white/64 sm:text-xs">
-                Open source,
-                <br />
-                Report bugs, request features, or contribute.
-              </p>
+              <div className="min-w-0 flex flex-1 items-center gap-2 pr-2">
+                <div className="min-w-0 space-y-0.5">
+                  <p className="text-[10px] tracking-[0.14em] text-white/58 uppercase">
+                    Open source
+                  </p>
+                  <p className="text-[10px] leading-snug text-white/72 sm:text-[11px] sm:leading-snug">
+                    If this helps you, please consider starring on github, means
+                    a lot. Issues, feature requests, and contributions are
+                    welcome.
+                  </p>
+                </div>
+              </div>
               <a
                 href={GITHUB_REPO_URL}
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Open Bunkialo GitHub repository"
-                className="shrink-0 inline-flex h-8 items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.06] px-3 text-[11px] font-medium text-white/88 shadow-[0_6px_16px_rgba(0,0,0,0.2)] transition-all duration-200 hover:-translate-y-px hover:border-white/35 hover:bg-white/[0.11] hover:text-white sm:text-xs"
+                className="shrink-0 inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/20 bg-white/[0.09] px-3.5 text-[11px] font-semibold text-white/92 shadow-[0_8px_18px_rgba(0,0,0,0.22)] transition-all duration-200 hover:-translate-y-px hover:border-[#FFAB00]/45 hover:bg-[#FFAB00]/12 hover:text-white sm:text-xs"
               >
-                <SiGithub className="size-3.5" />
-                {/* View repo */}
+                <Star
+                  className="size-3.5"
+                  style={{ color: "#FFAB00" }}
+                  fill="#FFAB00"
+                />
+                Star on GitHub
                 <ArrowUpRight className="size-3.5 opacity-80" />
               </a>
             </motion.div>
