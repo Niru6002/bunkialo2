@@ -19,10 +19,8 @@ const MAX_FOLDER_FILE_TESTS_PER_COURSE = 6;
 loadEnvFromRoot();
 
 const cheerio = await import("cheerio");
-const session = createLmsSession({
-  baseUrl: process.env.LMS_BASE_URL || DEFAULT_BASE_URL,
-});
-const BASE_URL = session.baseUrl;
+let session;
+let BASE_URL;
 
 const normalizeText = (value) => (value || "").replace(/\s+/g, " ").trim();
 
@@ -129,6 +127,11 @@ async function testDownloadTarget(kind, target) {
 }
 
 async function main() {
+  session = createLmsSession({
+    baseUrl: process.env.LMS_BASE_URL || DEFAULT_BASE_URL,
+  });
+  BASE_URL = session.baseUrl;
+
   console.log("======================================");
   console.log(" LMS AUTH DOWNLOAD TEST");
   console.log("======================================");

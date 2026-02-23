@@ -1,9 +1,10 @@
 import { Toast } from "@/components";
 import { Container } from "@/components/ui/container";
+import { ASSIGNMENT_STALE_MS } from "@/constants/assignment";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { getCurrentBaseUrl } from "@/services/api";
-import { ASSIGNMENT_STALE_MS, useAssignmentStore } from "@/stores/assignment-store";
+import { useAssignmentStore } from "@/stores/assignment-store";
 import { useAuthStore } from "@/stores/auth-store";
 import type { AssignmentUploadLocalFile } from "@/types";
 import { Ionicons } from "@expo/vector-icons";

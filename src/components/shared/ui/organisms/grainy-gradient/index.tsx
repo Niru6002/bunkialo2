@@ -52,6 +52,7 @@ const GrainyGradient: React.FC<IGrainyGradient> = ({
   // auto-stop animation after settleMs
   useEffect(() => {
     if (!animated || settleMs <= 0) return;
+    settled.value = 0;
     const timer = setTimeout(() => {
       settled.value = 1;
     }, settleMs);

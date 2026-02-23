@@ -3,15 +3,18 @@ const ASSIGNMENT_VIEW_PATH = "/mod/assign/view.php";
 export const getQueryParamValue = (url: string, key: string): string | null => {
   if (!url) return null;
 
-  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = url.match(new RegExp(`[?&]${escapedKey}=([^&]+)`));
-  if (!match?.[1]) return null;
-
+  let search = "";
   try {
-    return decodeURIComponent(match[1]);
+    search = new URL(url).search;
   } catch {
-    return match[1];
+    const queryStart = url.indexOf("?");
+    if (queryStart >= 0) {
+      search = url.slice(queryStart);
+    }
   }
+
+  const params = new URLSearchParams(search);
+  return params.get(key);
 };
 
 export const parseAssignmentIdFromMoodleUrl = (

@@ -2,8 +2,8 @@ import { createLmsSession, loadEnvFromRoot } from "./utils/lms-session.mjs";
 const cheerio = await import("cheerio");
 
 loadEnvFromRoot();
-const session = createLmsSession();
-const BASE_URL = session.baseUrl;
+let session;
+let BASE_URL;
 
 function normalizeText(value) {
   return (value || "").replace(/\s+/g, " ").trim();
@@ -154,6 +154,10 @@ async function analyzeCourse(courseId) {
 
       if (item.moduleType === "folder") {
         folderCount += 1;
+        if (!item.url) {
+          item.childrenCount = 0;
+          continue;
+        }
         const files = await parseFolderFiles(item.url);
         item.childrenCount = files.length;
         folderFileCount += files.length;
@@ -183,6 +187,9 @@ async function analyzeCourse(courseId) {
 }
 
 async function main() {
+  session = createLmsSession();
+  BASE_URL = session.baseUrl;
+
   console.log("======================================");
   console.log("  LMS RESOURCES SCRAPER TEST");
   console.log("======================================");

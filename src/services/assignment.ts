@@ -1,5 +1,6 @@
 import { checkSession, tryAutoLogin } from "@/services/auth";
 import { getCurrentBaseUrl } from "@/services/api";
+import { ASSIGNMENT_STALE_MS } from "@/constants/assignment";
 import type {
   AssignmentDetails,
   AssignmentEditSession,
@@ -48,8 +49,6 @@ type FileManagerInitConfig = {
 };
 
 type AssignmentDateKey = "opened" | "due" | "cutoff" | "allow submissions from";
-
-const ASSIGNMENT_STALE_MS = 30 * 60 * 1000;
 export const ASSIGNMENT_DETAILS_STALE_MS = ASSIGNMENT_STALE_MS;
 
 const normalizeText = (value: string): string =>
@@ -235,12 +234,19 @@ const extractCourseCrumb = (
     return { courseId: null, courseName: "Course" };
   }
 
-  const courseCrumb = crumbs[0]!;
-  const courseName = normalizeText(getText(courseCrumb)) || "Course";
-  const href = getAttr(querySelector(courseCrumb, "a[href]"), "href") ?? "";
-  const courseId = getQueryParamValue(href, "id");
+  for (const crumb of crumbs) {
+    const anchor = querySelector(crumb, "a[href*='/course/view.php']");
+    if (!anchor) continue;
 
-  return { courseId, courseName };
+    const href = getAttr(anchor, "href") ?? "";
+    const courseId = getQueryParamValue(href, "id");
+    if (!courseId) continue;
+
+    const courseName = normalizeText(getText(crumb)) || "Course";
+    return { courseId, courseName };
+  }
+
+  return { courseId: null, courseName: "Course" };
 };
 
 const extractDescription = (
@@ -368,6 +374,9 @@ export const fetchAssignmentDetails = async (
 ): Promise<AssignmentDetails> => {
   const response = await api.get<string>(`/mod/assign/view.php?id=${assignmentId}`);
   const html = response.data;
+  if (isLoginHtml(html)) {
+    throw new Error("Session expired while fetching assignment details");
+  }
   const doc = parseHtml(html);
 
   const { courseId, courseName } = extractCourseCrumb(doc);
@@ -618,6 +627,8 @@ export const submitAssignment = async (
 
   const files = payload.files ?? [];
   let draftItemIdToSubmit = session.draftItemId;
+  const maxFilesLimit =
+    session.maxFiles !== null && session.maxFiles >= 0 ? session.maxFiles : null;
   if (files.length > 0) {
     if (!session.supportsFileSubmission || !session.draftItemId) {
       return {
@@ -627,11 +638,11 @@ export const submitAssignment = async (
       };
     }
 
-    if (session.maxFiles !== null && files.length > session.maxFiles) {
+    if (maxFilesLimit !== null && files.length > maxFilesLimit) {
       return {
         success: false,
         reason: "validation",
-        message: `Maximum ${session.maxFiles} file(s) allowed`,
+        message: `Maximum ${maxFilesLimit} file(s) allowed`,
       };
     }
 

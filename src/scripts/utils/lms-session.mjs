@@ -145,9 +145,13 @@ export const createLmsSession = ({
         return response;
       }
       const redirectUrl = new URL(location, absoluteUrl).toString();
+      const isPreserveMethodRedirect =
+        response.status === 307 || response.status === 308;
       return fetchWithCookies(
         redirectUrl,
-        { method: "GET", headers: options.headers },
+        isPreserveMethodRedirect
+          ? options
+          : { method: "GET", headers: options.headers },
         redirectCount + 1,
       );
     }

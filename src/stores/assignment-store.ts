@@ -1,3 +1,4 @@
+import { ASSIGNMENT_STALE_MS } from "@/constants/assignment";
 import {
   fetchAssignmentDetailsWithSession,
   startAssignmentEditSession,
@@ -12,8 +13,6 @@ import type {
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { zustandStorage } from "./storage";
-
-export const ASSIGNMENT_STALE_MS = 30 * 60 * 1000;
 
 interface AssignmentCacheEntry {
   data: AssignmentDetails;

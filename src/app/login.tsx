@@ -2,9 +2,10 @@ import GrainyGradient from "@/components/shared/ui/organisms/grainy-gradient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
+import type { LoginTheme } from "@/types";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -17,28 +18,6 @@ import {
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-interface LoginTheme {
-  fieldBorder: string;
-  fieldBackground: string;
-  fieldFilledBorder: string;
-  fieldFilledBackground: string;
-  fieldFocusBorder: string;
-  fieldFocusBackground: string;
-  fieldFocusGlow: string;
-  fieldRadius: number;
-  inputPaddingLeft: number;
-  inputPaddingRight: number;
-  placeholderColor: string;
-  textColor: string;
-  iconIdle: string;
-  iconActive: string;
-  iconName: "account-circle-outline" | "at" | "account-outline";
-  lockName: "lock-outline" | "key-outline" | "shield-lock-outline";
-  eyeBorder: string;
-  eyeBackground: string;
-  eyeColor: string;
-}
 
 const LOGIN_THEME: LoginTheme = {
   fieldBorder: "rgba(244, 244, 245, 0.2)",
@@ -130,15 +109,12 @@ export default function LoginScreen() {
       return;
     }
 
-    await login(trimmedUsername, password);
+    await login(trimmedUsername, trimmedPassword);
   }, [username, password, login, setError]);
 
-  const hasUsername = useMemo(() => Boolean(username.trim()), [username]);
-  const hasPassword = useMemo(() => Boolean(password.trim()), [password]);
-  const canSubmit = useMemo(
-    () => hasUsername && hasPassword && !isLoading,
-    [hasUsername, hasPassword, isLoading],
-  );
+  const hasUsername = Boolean(username.trim());
+  const hasPassword = Boolean(password.trim());
+  const canSubmit = hasUsername && hasPassword && !isLoading;
   const theme = LOGIN_THEME;
   const heroAnimatedStyle = {
     opacity: heroProgress,
