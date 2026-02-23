@@ -26,7 +26,13 @@ export const loadEnvFromRoot = () => {
     const separator = trimmed.indexOf("=");
     if (separator <= 0) continue;
     const key = trimmed.slice(0, separator).trim();
-    const value = trimmed.slice(separator + 1).trim();
+    let value = trimmed.slice(separator + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
     if (!process.env[key]) {
       process.env[key] = value;
     }
@@ -146,7 +152,11 @@ export const createLmsSession = ({
       );
     }
 
-    if (redirectCount >= MAX_REDIRECTS) {
+    if (
+      redirectCount >= MAX_REDIRECTS &&
+      response.status >= 300 &&
+      response.status < 400
+    ) {
       throw new Error("Too many redirects while fetching LMS URL");
     }
 

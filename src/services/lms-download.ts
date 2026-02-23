@@ -1,42 +1,16 @@
 import { getCurrentBaseUrl } from "@/services/api";
 import { checkSession, tryAutoLogin } from "@/services/auth";
 import { cookieStore } from "@/services/cookie-store";
+import type {
+  LmsDownloadFailure,
+  LmsDownloadFailureReason,
+  LmsDownloadOptions,
+  LmsDownloadResult,
+  LmsDownloadSuccess,
+} from "@/types";
 import { debug } from "@/utils/debug";
 import { File, Paths } from "expo-file-system";
 import { fetch as expoFetch } from "expo/fetch";
-
-type LmsDownloadFailureReason =
-  | "reauth-failed"
-  | "http-error"
-  | "session-login-page"
-  | "network-error";
-
-export interface LmsDownloadSuccess {
-  success: true;
-  uri: string;
-  fileName: string;
-  status: number;
-  contentType: string | null;
-}
-
-export interface LmsDownloadFailure {
-  success: false;
-  reason: LmsDownloadFailureReason;
-  message: string;
-  status?: number;
-}
-
-export type LmsDownloadResult = LmsDownloadSuccess | LmsDownloadFailure;
-
-export interface LmsDownloadProgress {
-  totalBytesWritten: number;
-  totalBytesExpected: number | null;
-  fraction: number | null;
-}
-
-export interface LmsDownloadOptions {
-  onProgress?: (progress: LmsDownloadProgress) => void;
-}
 
 const LMS_USER_AGENT =
   "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/91.0.4472.120 Mobile";
@@ -134,9 +108,7 @@ const ensureAuthenticatedSession = async (): Promise<boolean> => {
   if (hasValidSession) return true;
 
   const reauthSuccess = await tryAutoLogin();
-  if (!reauthSuccess) return false;
-
-  return await checkSession();
+  return reauthSuccess;
 };
 
 const getHeaderValue = (headers: Headers, name: string): string | null =>
@@ -157,7 +129,8 @@ const buildFinalFileName = (
   const contentType = (
     getHeaderValue(headers, "content-type") || ""
   ).toLowerCase();
-  const extFromContentType = CONTENT_TYPE_EXTENSION_MAP[contentType] ?? "";
+  const bareContentType = contentType.split(";")[0]?.trim() ?? "";
+  const extFromContentType = CONTENT_TYPE_EXTENSION_MAP[bareContentType] ?? "";
   const extension = extFromPath || extFromContentType;
 
   if (extension && !preferredBase.toLowerCase().endsWith(extension)) {
@@ -312,9 +285,17 @@ const performDownloadAttempt = async (
   const contentType = (
     response.headers.get("content-type") || ""
   ).toLowerCase();
+  const contentDisposition = (
+    response.headers.get("content-disposition") || ""
+  ).toLowerCase();
+  const isAttachmentHtml =
+    (contentDisposition.includes("attachment") ||
+      contentDisposition.includes("filename=")) &&
+    (contentDisposition.includes(".html") || contentDisposition.includes(".htm"));
   if (
-    contentType.includes("text/html") ||
-    contentType.includes("application/xhtml")
+    !isAttachmentHtml &&
+    (contentType.includes("text/html") ||
+      contentType.includes("application/xhtml"))
   ) {
     const html = await response.text();
     if (isLoginHtml(html)) {

@@ -14,6 +14,7 @@ export * from "./dashboard";
 export * from "./faculty";
 export * from "./gpa";
 export * from "./lms";
+export * from "./lms-download";
 export * from "./resources";
 export * from "./timetable";
 export * from "./wifix";

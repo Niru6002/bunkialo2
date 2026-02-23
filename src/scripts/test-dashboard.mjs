@@ -8,8 +8,8 @@ import { writeFileSync } from "fs";
 import { createLmsSession, loadEnvFromRoot } from "./utils/lms-session.mjs";
 
 loadEnvFromRoot();
-const session = createLmsSession();
-const BASE_URL = session.baseUrl;
+let session;
+let BASE_URL;
 
 async function testTimelineApi(sesskey) {
   console.log("\n[2] TESTING core_calendar_get_action_events_by_timesort");
@@ -72,6 +72,9 @@ async function main() {
   console.log("======================================");
 
   try {
+    session = createLmsSession();
+    BASE_URL = session.baseUrl;
+
     console.log("\n[1] LOGIN");
     const loginOk = await session.login();
     const cookieCount = await session.getCookieCount();

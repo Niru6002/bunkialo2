@@ -103,8 +103,16 @@ export const EventCard = ({ event, isOverdue }: EventCardProps) => {
     bunkCourses.find((course) => course.courseId === String(event.course.id))
       ?.config?.color || fallbackColor;
 
-  const openOnLms = () => {
-    void Linking.openURL(event.url);
+  const openOnLms = async () => {
+    try {
+      const canOpen = await Linking.canOpenURL(event.url);
+      if (!canOpen) {
+        throw new Error("Unsupported URL");
+      }
+      await Linking.openURL(event.url);
+    } catch {
+      Toast.show("Could not open LMS link", { type: "error" });
+    }
   };
 
   const openCourseResources = () => {
@@ -177,7 +185,8 @@ export const EventCard = ({ event, isOverdue }: EventCardProps) => {
                 ? Colors.status.danger + "22"
                 : courseColor + "22",
             }}
-            onPress={() => {
+            onPress={(pressedEvent) => {
+              pressedEvent.stopPropagation();
               if (!isWithinNextHour) {
                 setShowPreciseCountdown((prev) => !prev);
               }
@@ -230,7 +239,7 @@ export const EventCard = ({ event, isOverdue }: EventCardProps) => {
           })}
           onPress={(pressedEvent) => {
             pressedEvent.stopPropagation();
-            openOnLms();
+            void openOnLms();
           }}
         >
           <View className="flex-row items-center gap-1.5">

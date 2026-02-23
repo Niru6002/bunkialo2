@@ -8,7 +8,8 @@ import {
   LMS_RESOURCES_STALE_MS,
   useLmsResourcesStore,
 } from "@/stores/lms-resources-store";
-import type { LmsResourceItemNode } from "@/types";
+import { downloadLmsResourceWithSession } from "@/services/lms-download";
+import type { LmsDownloadProgress, LmsResourceItemNode } from "@/types";
 import { extractCourseName } from "@/utils/course-name";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -24,8 +25,6 @@ import {
   Text,
   View,
 } from "react-native";
-import type { LmsDownloadProgress } from "../../services/lms-download";
-import { downloadLmsResourceWithSession } from "../../services/lms-download";
 import {
   formatSyncTime,
   getModuleVisual,
@@ -205,28 +204,34 @@ export default function CourseResourcesScreen() {
         return;
       }
 
-      const canShare = await isAvailableAsync();
-      if (canShare) {
-        await shareAsync(downloadResult.uri, {
-          dialogTitle: "Open downloaded file",
+      try {
+        const canShare = await isAvailableAsync();
+        if (canShare) {
+          await shareAsync(downloadResult.uri, {
+            dialogTitle: "Open downloaded file",
+          });
+        } else {
+          await Linking.openURL(downloadResult.uri);
+        }
+        Toast.show("Downloaded successfully", {
+          type: "success",
         });
-      } else {
-        await Linking.openURL(downloadResult.uri);
+      } catch {
+        Toast.show("Downloaded, but could not open file", {
+          type: "warning",
+        });
+      } finally {
+        setDownloadingUrlSet((prev) => {
+          const next = { ...prev };
+          delete next[url];
+          return next;
+        });
+        setDownloadProgressByUrl((prev) => {
+          const next = { ...prev };
+          delete next[url];
+          return next;
+        });
       }
-
-      setDownloadingUrlSet((prev) => {
-        const next = { ...prev };
-        delete next[url];
-        return next;
-      });
-      setDownloadProgressByUrl((prev) => {
-        const next = { ...prev };
-        delete next[url];
-        return next;
-      });
-      Toast.show("Downloaded successfully", {
-        type: "success",
-      });
       return;
     }
 

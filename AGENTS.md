@@ -404,4 +404,4 @@ node src/scripts/test-timetable-logic.mjs
 
 ---
 
-**Expo SDK**: 54 | **React Native**: 0.81.5 | **TypeScript**: 5.9.2 (strict) | **React**: 19.1.0 | **Preferred package manager**: pnpm
+**Expo SDK**: 54 | **React Native**: 0.81.5 | **TypeScript**: 5.9.2 (strict) | **React**: 19.1.0 | **Preferred package manager**: bun

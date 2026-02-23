@@ -26,6 +26,7 @@ type LmsResourcesStoreState = LmsResourcesState & LmsResourcesStoreActions;
 
 const inFlightByCourseId = new Map<string, Promise<LmsCourseResourcesTree>>();
 let prefetchInFlight: Promise<void> | null = null;
+let resourceGeneration = 0;
 
 const isStale = (lastSyncTime: number | null): boolean => {
   if (!lastSyncTime) return true;
@@ -87,6 +88,7 @@ export const useLmsResourcesStore = create<LmsResourcesStoreState>()(
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
 
       fetchCourseResources: async (courseId, options) => {
+        const generationAtRequest = resourceGeneration;
         const force = options?.force ?? false;
         const silent = options?.silent ?? false;
 
@@ -120,6 +122,9 @@ export const useLmsResourcesStore = create<LmsResourcesStoreState>()(
 
         try {
           const tree = await request;
+          if (generationAtRequest !== resourceGeneration) {
+            return;
+          }
 
           set((state) => ({
             cacheByCourseId: {
@@ -146,6 +151,9 @@ export const useLmsResourcesStore = create<LmsResourcesStoreState>()(
             },
           }));
         } catch (error) {
+          if (generationAtRequest !== resourceGeneration) {
+            return;
+          }
           const message =
             error instanceof Error
               ? error.message
@@ -173,6 +181,7 @@ export const useLmsResourcesStore = create<LmsResourcesStoreState>()(
       },
 
       prefetchEnrolledCourseResources: async () => {
+        const generationAtPrefetchStart = resourceGeneration;
         if (prefetchInFlight) {
           await prefetchInFlight;
           return;
@@ -187,6 +196,9 @@ export const useLmsResourcesStore = create<LmsResourcesStoreState>()(
         prefetchInFlight = (async () => {
           try {
             const courses = await fetchCourses();
+            if (generationAtPrefetchStart !== resourceGeneration) {
+              return;
+            }
             const cache = get().cacheByCourseId;
 
             const staleCourseIds = courses
@@ -197,6 +209,9 @@ export const useLmsResourcesStore = create<LmsResourcesStoreState>()(
               });
 
             if (staleCourseIds.length === 0) {
+              if (generationAtPrefetchStart !== resourceGeneration) {
+                return;
+              }
               set({ lastPrefetchTime: Date.now() });
               return;
             }
@@ -208,10 +223,12 @@ export const useLmsResourcesStore = create<LmsResourcesStoreState>()(
                 await get().fetchCourseResources(courseId, { silent: true });
               },
             );
-
+            if (generationAtPrefetchStart !== resourceGeneration) {
+              return;
+            }
             set({ lastPrefetchTime: Date.now() });
           } catch {
-            set({ lastPrefetchTime: Date.now() });
+            // Intentionally skip cooldown update on failures to allow quick retry.
           } finally {
             prefetchInFlight = null;
           }
@@ -248,6 +265,7 @@ export const useLmsResourcesStore = create<LmsResourcesStoreState>()(
       },
 
       clearCourseResources: () => {
+        resourceGeneration += 1;
         inFlightByCourseId.clear();
         prefetchInFlight = null;
         set({
@@ -267,8 +285,11 @@ export const useLmsResourcesStore = create<LmsResourcesStoreState>()(
         expandedByCourseId: state.expandedByCourseId,
         lastPrefetchTime: state.lastPrefetchTime,
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+      onRehydrateStorage: () => (_state, error) => {
+        if (error) {
+          console.warn("LMS resources store rehydration failed", error);
+        }
+        useLmsResourcesStore.setState({ hasHydrated: true });
       },
     },
   ),

@@ -10,6 +10,10 @@ import type {
 } from "@/types";
 import { debug } from "@/utils/debug";
 import {
+  getQueryParamValue,
+  parseAssignmentIdFromMoodleUrl,
+} from "@/utils/moodle-url";
+import {
   getAttr,
   getText,
   parseHtml,
@@ -74,11 +78,6 @@ const parseNumberValue = (value: string | number | null | undefined): number | n
   return null;
 };
 
-const getQueryParam = (url: string, key: string): string | null => {
-  const match = url.match(new RegExp(`[?&]${key}=([^&]+)`));
-  return match?.[1] ?? null;
-};
-
 const isLoginHtml = (html: string): boolean => {
   const normalized = html.replace(/\s+/g, " ");
   return (
@@ -93,9 +92,7 @@ const ensureAuthenticatedSession = async (): Promise<boolean> => {
   if (hasSession) return true;
 
   const relogin = await tryAutoLogin();
-  if (!relogin) return false;
-
-  return checkSession();
+  return relogin;
 };
 
 const extractJsonObjectAfterMarker = (input: string, marker: string): string | null => {
@@ -241,7 +238,7 @@ const extractCourseCrumb = (
   const courseCrumb = crumbs[0]!;
   const courseName = normalizeText(getText(courseCrumb)) || "Course";
   const href = getAttr(querySelector(courseCrumb, "a[href]"), "href") ?? "";
-  const courseId = getQueryParam(href, "id");
+  const courseId = getQueryParamValue(href, "id");
 
   return { courseId, courseName };
 };
@@ -301,6 +298,7 @@ const validateFileType = (
   acceptedTypes: string[],
 ): { ok: boolean; message?: string } => {
   if (acceptedTypes.length === 0) return { ok: true };
+  if (acceptedTypes.includes("*")) return { ok: true };
   if (acceptedTypes.includes("document")) return { ok: true };
 
   const extension = getFileExtension(fileName);
@@ -363,7 +361,7 @@ const parseJsonData = <T>(value: unknown): T | null => {
 };
 
 export const parseAssignmentIdFromUrl = (url: string): string | null =>
-  getQueryParam(url, "id");
+  parseAssignmentIdFromMoodleUrl(url);
 
 export const fetchAssignmentDetails = async (
   assignmentId: string,
@@ -619,6 +617,7 @@ export const submitAssignment = async (
   }
 
   const files = payload.files ?? [];
+  let draftItemIdToSubmit = session.draftItemId;
   if (files.length > 0) {
     if (!session.supportsFileSubmission || !session.draftItemId) {
       return {
@@ -638,9 +637,10 @@ export const submitAssignment = async (
 
     for (const file of files) {
       try {
-        await uploadAssignmentDraftFile(session, file, {
+        const uploadedDraft = await uploadAssignmentDraftFile(session, file, {
           onProgress: options?.onProgress,
         });
+        draftItemIdToSubmit = uploadedDraft.itemId;
       } catch (error) {
         return {
           success: false,
@@ -657,8 +657,8 @@ export const submitAssignment = async (
     requestParams.set(name, value);
   }
 
-  if (session.supportsFileSubmission && session.draftItemId) {
-    requestParams.set("files_filemanager", session.draftItemId);
+  if (session.supportsFileSubmission && draftItemIdToSubmit) {
+    requestParams.set("files_filemanager", draftItemIdToSubmit);
   }
 
   if (session.supportsOnlineTextSubmission && session.onlineTextFieldName) {
@@ -672,7 +672,7 @@ export const submitAssignment = async (
         requestParams.set(`${base}[format]`, "1");
       }
       if (!requestParams.has(`${base}[itemid]`)) {
-        requestParams.set(`${base}[itemid]`, session.draftItemId ?? "0");
+        requestParams.set(`${base}[itemid]`, draftItemIdToSubmit ?? "0");
       }
     }
   }

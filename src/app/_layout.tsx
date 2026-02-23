@@ -4,8 +4,6 @@ import "../global.css";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuthStore } from "@/stores/auth-store";
-import { useAttendanceStore } from "@/stores/attendance-store";
-import { useBunkStore } from "@/stores/bunk-store";
 import { useDashboardStore } from "@/stores/dashboard-store";
 import { ToastProviderWithViewport } from "@/components";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -52,8 +50,6 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { isLoggedIn, isCheckingAuth, isOffline, checkAuth } = useAuthStore();
   const { hasHydrated: dashboardHydrated } = useDashboardStore();
-  const { hasHydrated: attendanceHydrated } = useAttendanceStore();
-  const { hasHydrated: bunkHydrated } = useBunkStore();
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
   const [fontsLoaded, fontError] = useFonts({
@@ -62,7 +58,7 @@ export default function RootLayout() {
   });
   const splashHiddenRef = useRef(false);
   const fontsReady = fontsLoaded || Boolean(fontError);
-  const appHydrated = dashboardHydrated && attendanceHydrated && bunkHydrated;
+  const appHydrated = dashboardHydrated;
 
   useEffect(() => {
     checkAuth();

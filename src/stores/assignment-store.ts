@@ -1,7 +1,7 @@
 import {
   fetchAssignmentDetailsWithSession,
   startAssignmentEditSession,
-  submitAssignment,
+  submitAssignment as submitAssignmentService,
 } from "@/services/assignment";
 import type {
   AssignmentDetails,
@@ -158,6 +158,17 @@ export const useAssignmentStore = create<AssignmentStore>()(
           return existing;
         }
 
+        set((state) => ({
+          isLoadingByAssignmentId: {
+            ...state.isLoadingByAssignmentId,
+            [assignmentId]: true,
+          },
+          errorByAssignmentId: {
+            ...state.errorByAssignmentId,
+            [assignmentId]: null,
+          },
+        }));
+
         let request = editRequestsInFlight.get(assignmentId);
         if (!request) {
           request = startAssignmentEditSession(assignmentId);
@@ -175,6 +186,10 @@ export const useAssignmentStore = create<AssignmentStore>()(
               ...state.errorByAssignmentId,
               [assignmentId]: null,
             },
+            isLoadingByAssignmentId: {
+              ...state.isLoadingByAssignmentId,
+              [assignmentId]: false,
+            },
           }));
           return session;
         } catch (error) {
@@ -186,6 +201,10 @@ export const useAssignmentStore = create<AssignmentStore>()(
             errorByAssignmentId: {
               ...state.errorByAssignmentId,
               [assignmentId]: message,
+            },
+            isLoadingByAssignmentId: {
+              ...state.isLoadingByAssignmentId,
+              [assignmentId]: false,
             },
           }));
           return null;
@@ -227,26 +246,41 @@ export const useAssignmentStore = create<AssignmentStore>()(
           };
         }
 
-        const result = await submitAssignment(session, payload, {
-          onProgress: (fraction) => {
-            set((state) => ({
-              uploadProgressByAssignmentId: {
-                ...state.uploadProgressByAssignmentId,
-                [assignmentId]: fraction,
-              },
-            }));
-          },
-        });
+        let result: AssignmentSubmitResult;
+        try {
+          result = await submitAssignmentService(session, payload, {
+            onProgress: (fraction) => {
+              set((state) => ({
+                uploadProgressByAssignmentId: {
+                  ...state.uploadProgressByAssignmentId,
+                  [assignmentId]: fraction,
+                },
+              }));
+            },
+          });
+        } catch (error) {
+          result = {
+            success: false,
+            reason: "network",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Submission failed unexpectedly",
+          };
+        } finally {
+          set((state) => ({
+            isSubmittingByAssignmentId: {
+              ...state.isSubmittingByAssignmentId,
+              [assignmentId]: false,
+            },
+            uploadProgressByAssignmentId: {
+              ...state.uploadProgressByAssignmentId,
+              [assignmentId]: null,
+            },
+          }));
+        }
 
         set((state) => ({
-          isSubmittingByAssignmentId: {
-            ...state.isSubmittingByAssignmentId,
-            [assignmentId]: false,
-          },
-          uploadProgressByAssignmentId: {
-            ...state.uploadProgressByAssignmentId,
-            [assignmentId]: null,
-          },
           errorByAssignmentId: {
             ...state.errorByAssignmentId,
             [assignmentId]: result.success ? null : result.message,
@@ -287,7 +321,6 @@ export const useAssignmentStore = create<AssignmentStore>()(
       storage: createJSONStorage(() => zustandStorage),
       partialize: (state) => ({
         detailsByAssignmentId: state.detailsByAssignmentId,
-        editSessionByAssignmentId: state.editSessionByAssignmentId,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

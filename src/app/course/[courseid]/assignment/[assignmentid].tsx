@@ -97,6 +97,16 @@ export default function AssignmentDetailScreen() {
   );
 
   const details = entry?.data;
+  const supportsFileSubmission = Boolean(
+    details?.supportsFileSubmission || editSession?.supportsFileSubmission,
+  );
+  const supportsOnlineTextSubmission = Boolean(
+    details?.supportsOnlineTextSubmission ||
+      editSession?.supportsOnlineTextSubmission,
+  );
+  const canEditSubmission = Boolean(details?.canEditSubmission);
+  const effectiveMaxFiles = details?.maxFiles ?? editSession?.maxFiles ?? null;
+  const effectiveMaxBytes = details?.maxBytes ?? editSession?.maxBytes ?? null;
   const [onlineText, setOnlineText] = useState("");
   const [files, setFiles] = useState<AssignmentUploadLocalFile[]>([]);
   const [hasSeededOnlineText, setHasSeededOnlineText] = useState(false);
@@ -134,8 +144,8 @@ export default function AssignmentDetailScreen() {
   const breadcrumbAssignment =
     details?.assignmentName ?? (assignmentId ? `Assignment ${assignmentId}` : "Assignment");
   const maxFileSizeLabel = useMemo(
-    () => formatMaxBytes(details?.maxBytes ?? null),
-    [details?.maxBytes],
+    () => formatMaxBytes(effectiveMaxBytes),
+    [effectiveMaxBytes],
   );
 
   const openOnLms = async () => {
@@ -167,7 +177,7 @@ export default function AssignmentDetailScreen() {
   };
 
   const addFiles = async () => {
-    if (!details?.supportsFileSubmission) {
+    if (!supportsFileSubmission) {
       Toast.show("This assignment does not accept file submissions", {
         type: "warning",
       });
@@ -194,9 +204,9 @@ export default function AssignmentDetailScreen() {
     }
 
     let nextFiles = Array.from(deduped.values());
-    if (details.maxFiles !== null && nextFiles.length > details.maxFiles) {
-      nextFiles = nextFiles.slice(0, details.maxFiles);
-      Toast.show(`Only ${details.maxFiles} file(s) allowed for this assignment`, {
+    if (effectiveMaxFiles !== null && nextFiles.length > effectiveMaxFiles) {
+      nextFiles = nextFiles.slice(0, effectiveMaxFiles);
+      Toast.show(`Only ${effectiveMaxFiles} file(s) allowed for this assignment`, {
         type: "warning",
       });
     }
@@ -216,15 +226,14 @@ export default function AssignmentDetailScreen() {
       });
       return;
     }
-    if (!details?.canEditSubmission) {
+    if (!canEditSubmission) {
       Toast.show("Submission is not editable right now.", {
         type: "warning",
       });
       return;
     }
 
-    const hasInput =
-      details.supportsFileSubmission || details.supportsOnlineTextSubmission;
+    const hasInput = supportsFileSubmission || supportsOnlineTextSubmission;
     if (!hasInput) {
       Toast.show("No supported submission method found for this assignment.", {
         type: "warning",
@@ -233,8 +242,8 @@ export default function AssignmentDetailScreen() {
     }
 
     const hasAnyPayload =
-      (details.supportsFileSubmission && files.length > 0) ||
-      (details.supportsOnlineTextSubmission && onlineText.trim().length > 0);
+      (supportsFileSubmission && files.length > 0) ||
+      (supportsOnlineTextSubmission && onlineText.trim().length > 0);
     if (!hasAnyPayload) {
       Toast.show("Add a file or text before submitting.", {
         type: "warning",
@@ -244,15 +253,15 @@ export default function AssignmentDetailScreen() {
 
     const result = await submitAssignment(assignmentId, {
       assignmentId,
-      files: details.supportsFileSubmission ? files : [],
-      onlineTextHtml: details.supportsOnlineTextSubmission
-        ? onlineText
-        : undefined,
+      files: supportsFileSubmission ? files : [],
+      onlineTextHtml: supportsOnlineTextSubmission ? onlineText : undefined,
     });
 
     if (result.success) {
       Toast.show(result.message, { type: "success" });
       setFiles([]);
+      setOnlineText("");
+      setHasSeededOnlineText(false);
       return;
     }
 
@@ -451,25 +460,25 @@ export default function AssignmentDetailScreen() {
                 </Text>
                 <Text className="text-[12px]" style={{ color: theme.textSecondary }}>
                   Methods:{" "}
-                  {details.supportsFileSubmission ? "File" : ""}
-                  {details.supportsFileSubmission && details.supportsOnlineTextSubmission
+                  {supportsFileSubmission ? "File" : ""}
+                  {supportsFileSubmission && supportsOnlineTextSubmission
                     ? " + "
                     : ""}
-                  {details.supportsOnlineTextSubmission ? "Online text" : ""}
-                  {!details.supportsFileSubmission &&
-                  !details.supportsOnlineTextSubmission
+                  {supportsOnlineTextSubmission ? "Online text" : ""}
+                  {!supportsFileSubmission &&
+                  !supportsOnlineTextSubmission
                     ? "Not editable"
                     : ""}
                 </Text>
-                {details.supportsFileSubmission && (
+                {supportsFileSubmission && (
                   <Text className="text-[12px]" style={{ color: theme.textSecondary }}>
-                    Limits: {details.maxFiles ?? "?"} file(s)
+                    Limits: {effectiveMaxFiles ?? "?"} file(s)
                     {maxFileSizeLabel ? `, ${maxFileSizeLabel}` : ""}
                   </Text>
                 )}
               </View>
 
-              {details.supportsFileSubmission && (
+              {supportsFileSubmission && (
                 <View className="mt-3 gap-2">
                   <Pressable
                     className="rounded-xl border px-3 py-2.5"
@@ -510,7 +519,7 @@ export default function AssignmentDetailScreen() {
                 </View>
               )}
 
-              {details.supportsOnlineTextSubmission && (
+              {supportsOnlineTextSubmission && (
                 <View className="mt-3">
                   <TextInput
                     multiline
@@ -541,20 +550,28 @@ export default function AssignmentDetailScreen() {
                 <Pressable
                   className="flex-1 items-center rounded-xl px-3 py-2.5"
                   style={{
-                    backgroundColor: details.canEditSubmission
+                    backgroundColor: canEditSubmission
                       ? Colors.accent
                       : theme.background,
                     borderColor: theme.border,
-                    borderWidth: details.canEditSubmission ? 0 : 1,
+                    borderWidth: canEditSubmission ? 0 : 1,
                     opacity: isSubmitting ? 0.7 : 1,
                   }}
-                  disabled={isSubmitting || !details.canEditSubmission}
+                  disabled={isSubmitting || !canEditSubmission}
                   onPress={() => void handleSubmit()}
                 >
                   {isSubmitting ? (
-                    <ActivityIndicator size="small" color={Colors.white} />
+                    <ActivityIndicator
+                      size="small"
+                      color={canEditSubmission ? Colors.white : theme.text}
+                    />
                   ) : (
-                    <Text className="text-[13px] font-semibold" style={{ color: Colors.white }}>
+                    <Text
+                      className="text-[13px] font-semibold"
+                      style={{
+                        color: canEditSubmission ? Colors.white : theme.text,
+                      }}
+                    >
                       Submit
                     </Text>
                   )}

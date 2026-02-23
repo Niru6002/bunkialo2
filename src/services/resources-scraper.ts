@@ -19,6 +19,15 @@ import { api, BASE_URL } from "./api";
 const normalizeText = (value: string): string =>
   value.replace(/\s+/g, " ").trim();
 
+const isLoginHtml = (html: string): boolean => {
+  const normalized = html.replace(/\s+/g, " ");
+  return (
+    normalized.includes('name="logintoken"') ||
+    normalized.includes('id="login"') ||
+    normalized.includes("/login/index.php")
+  );
+};
+
 const toAbsoluteUrl = (href: string): string => {
   if (href.startsWith("http://") || href.startsWith("https://")) {
     return href;
@@ -193,6 +202,9 @@ export const fetchCourseResources = async (
   debug.scraper(`=== FETCHING COURSE RESOURCES: ${courseId} ===`);
 
   const response = await api.get<string>(`/course/view.php?id=${courseId}`);
+  if (isLoginHtml(response.data)) {
+    throw new Error("Session expired while fetching course resources");
+  }
   const doc = parseHtml(response.data);
 
   const courseTitle =

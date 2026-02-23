@@ -1,5 +1,5 @@
-const cheerio = await import("cheerio");
 import { createLmsSession, loadEnvFromRoot } from "./utils/lms-session.mjs";
+const cheerio = await import("cheerio");
 
 loadEnvFromRoot();
 const session = createLmsSession();
@@ -173,7 +173,9 @@ async function analyzeCourse(courseId) {
 
   if (errors.length > 0) {
     console.log(`  Validation errors: ${errors.length}`);
-    errors.forEach((error) => console.log(`    - ${error}`));
+    errors.forEach((error) => {
+      console.log(`    - ${error}`);
+    });
     throw new Error(`Validation failed for course ${courseId}`);
   }
 

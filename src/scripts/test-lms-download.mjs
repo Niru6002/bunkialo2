@@ -27,7 +27,7 @@ const BASE_URL = session.baseUrl;
 const normalizeText = (value) => (value || "").replace(/\s+/g, " ").trim();
 
 const getContentType = (headers) => {
-  const value = headers.get("content-type") || headers.get("Content-Type") || "";
+  const value = headers.get("content-type") || "";
   return String(value).toLowerCase();
 };
 
@@ -109,10 +109,12 @@ async function testDownloadTarget(kind, target) {
   const response = await session.fetchWithSession(target.url);
   const status = response.status;
   const contentType = getContentType(response.headers);
-  const bodyText =
-    contentType.includes("text/html") || contentType.includes("application/xhtml")
-      ? await response.text()
-      : null;
+  const isHtmlResponse =
+    contentType.includes("text/html") || contentType.includes("application/xhtml");
+  const bodyText = isHtmlResponse ? await response.text() : null;
+  if (!isHtmlResponse) {
+    await response.arrayBuffer();
+  }
   const loginPage = bodyText ? isLoginHtml(bodyText) : false;
 
   return {
@@ -163,7 +165,8 @@ async function main() {
   const okCount = allResults.filter((item) => item.ok).length;
   const failCount = allResults.length - okCount;
 
-  const reportPath = path.join(ROOT_DIR, "src", "scripts", "lms-download-report.json");
+  const reportPath = path.join(ROOT_DIR, "artifacts", "lms-download-report.json");
+  fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   fs.writeFileSync(
     reportPath,
     JSON.stringify(

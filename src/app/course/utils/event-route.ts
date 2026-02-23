@@ -1,27 +1,23 @@
 import type { TimelineEvent } from "@/types";
-
-const getQueryParam = (url: string, key: string): string | null => {
-  const match = url.match(new RegExp(`[?&]${key}=([^&]+)`));
-  return match?.[1] ?? null;
-};
+import {
+  getQueryParamValue,
+  parseAssignmentIdFromMoodleUrl,
+} from "@/utils/moodle-url";
 
 const parseCourseIdFromUrl = (url: string): string | null => {
   if (!url) return null;
 
-  const courseIdParam = getQueryParam(url, "course");
+  const courseIdParam = getQueryParamValue(url, "course");
   if (courseIdParam) return courseIdParam;
 
-  const viewId = getQueryParam(url, "id");
+  const viewId = getQueryParamValue(url, "id");
   if (viewId && url.includes("/course/view.php")) return viewId;
 
   return null;
 };
 
 export const parseAssignmentIdFromUrl = (url: string): string | null => {
-  if (!url) return null;
-  const id = getQueryParam(url, "id");
-  if (!id) return null;
-  return url.includes("/mod/assign/view.php") ? id : null;
+  return parseAssignmentIdFromMoodleUrl(url);
 };
 
 export const resolveEventCourseId = (event: TimelineEvent): string | null => {

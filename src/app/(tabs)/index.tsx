@@ -69,6 +69,7 @@ export default function DashboardScreen() {
   const [showDevInfo, setShowDevInfo] = useState(false);
   const isFocused = useIsFocused();
   const hasAutoRefreshed = useRef(false);
+  const hasDeferredResourcePrefetch = useRef(false);
 
   useEffect(() => {
     if (!hasHydrated || hasAutoRefreshed.current) return;
@@ -112,12 +113,22 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     if (!hasHydrated || !resourcesHydrated || isOffline) return;
+    if (hasDeferredResourcePrefetch.current) return;
+    hasDeferredResourcePrefetch.current = true;
 
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const task = InteractionManager.runAfterInteractions(() => {
-      void prefetchEnrolledCourseResources();
+      timeoutId = setTimeout(() => {
+        void prefetchEnrolledCourseResources();
+      }, 1200);
     });
 
-    return () => task.cancel();
+    return () => {
+      task.cancel();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [
     hasHydrated,
     isOffline,
