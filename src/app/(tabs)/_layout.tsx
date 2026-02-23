@@ -31,6 +31,8 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: theme.tabIconSelected,
         tabBarInactiveTintColor: theme.tabIconDefault,
+        lazy: true,
+        lazyPreloadDistance: 0,
         tabBarAllowFontScaling: false,
         tabBarLabel: ({ color, children }) => (
           <Text

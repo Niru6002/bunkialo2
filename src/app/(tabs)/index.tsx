@@ -8,6 +8,7 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuthStore } from "@/stores/auth-store";
 import { useDashboardStore } from "@/stores/dashboard-store";
+import { useLmsResourcesStore } from "@/stores/lms-resources-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { initializeNotifications } from "@/utils/notifications";
 import { Ionicons } from "@expo/vector-icons";
@@ -55,6 +56,10 @@ export default function DashboardScreen() {
     hasHydrated,
   } = useDashboardStore();
   const { isOffline, setOffline, username } = useAuthStore();
+  const {
+    hasHydrated: resourcesHydrated,
+    prefetchEnrolledCourseResources,
+  } = useLmsResourcesStore();
   const refreshIntervalMinutes = useSettingsStore(
     (state) => state.refreshIntervalMinutes,
   );
@@ -64,6 +69,7 @@ export default function DashboardScreen() {
   const [showDevInfo, setShowDevInfo] = useState(false);
   const isFocused = useIsFocused();
   const hasAutoRefreshed = useRef(false);
+  const hasDeferredResourcePrefetch = useRef(false);
 
   useEffect(() => {
     if (!hasHydrated || hasAutoRefreshed.current) return;
@@ -104,6 +110,31 @@ export default function DashboardScreen() {
       return () => task.cancel();
     }
   }, [hasHydrated]);
+
+  useEffect(() => {
+    if (!hasHydrated || !resourcesHydrated || isOffline) return;
+    if (hasDeferredResourcePrefetch.current) return;
+    hasDeferredResourcePrefetch.current = true;
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const task = InteractionManager.runAfterInteractions(() => {
+      timeoutId = setTimeout(() => {
+        void prefetchEnrolledCourseResources();
+      }, 1200);
+    });
+
+    return () => {
+      task.cancel();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [
+    hasHydrated,
+    isOffline,
+    prefetchEnrolledCourseResources,
+    resourcesHydrated,
+  ]);
 
   useEffect(() => {
     if (isOffline && lastSyncTime) {

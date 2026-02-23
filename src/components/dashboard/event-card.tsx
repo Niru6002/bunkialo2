@@ -1,9 +1,14 @@
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import {
+  resolveDashboardEventRoute,
+} from "@/app/course/utils/event-route";
 import { useBunkStore } from "@/stores/bunk-store";
+import { Toast } from "@/components";
 import type { TimelineEvent } from "@/types";
 import { extractCourseName } from "@/utils/course-name";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 
@@ -98,8 +103,42 @@ export const EventCard = ({ event, isOverdue }: EventCardProps) => {
     bunkCourses.find((course) => course.courseId === String(event.course.id))
       ?.config?.color || fallbackColor;
 
-  const openOnLms = () => {
-    Linking.openURL(event.url);
+  const openOnLms = async () => {
+    if (!event.url?.trim()) {
+      Toast.show("No LMS link available for this event", { type: "error" });
+      return;
+    }
+    try {
+      const canOpen = await Linking.canOpenURL(event.url);
+      if (!canOpen) {
+        throw new Error("Unsupported URL");
+      }
+      await Linking.openURL(event.url);
+    } catch {
+      Toast.show("Could not open LMS link", { type: "error" });
+    }
+  };
+
+  const openCourseResources = () => {
+    const route = resolveDashboardEventRoute(event);
+    if (route.type === "unresolved") {
+      Toast.show("Could not resolve course for this event", {
+        type: "error",
+      });
+      return;
+    }
+
+    if (route.type === "assignment") {
+      router.push(
+        `/course/${route.courseId}/assignment/${route.assignmentId}`,
+      );
+      return;
+    }
+
+    router.push({
+      pathname: "/course/[courseid]",
+      params: { courseid: route.courseId },
+    });
   };
 
   useEffect(() => {
@@ -110,7 +149,8 @@ export const EventCard = ({ event, isOverdue }: EventCardProps) => {
   }, []);
 
   return (
-    <View
+    <Pressable
+      onPress={openCourseResources}
       className="gap-3 rounded-2xl border p-4"
       style={{
         backgroundColor: theme.backgroundSecondary,
@@ -149,7 +189,8 @@ export const EventCard = ({ event, isOverdue }: EventCardProps) => {
                 ? Colors.status.danger + "22"
                 : courseColor + "22",
             }}
-            onPress={() => {
+            onPress={(pressedEvent) => {
+              pressedEvent.stopPropagation();
               if (!isWithinNextHour) {
                 setShowPreciseCountdown((prev) => !prev);
               }
@@ -200,7 +241,10 @@ export const EventCard = ({ event, isOverdue }: EventCardProps) => {
                 : Colors.gray[50],
             borderColor: isPastDue ? Colors.status.danger + "66" : theme.border,
           })}
-          onPress={openOnLms}
+          onPress={(pressedEvent) => {
+            pressedEvent.stopPropagation();
+            void openOnLms();
+          }}
         >
           <View className="flex-row items-center gap-1.5">
             <Text className="text-xs font-semibold" style={{ color: theme.text }}>
@@ -210,6 +254,6 @@ export const EventCard = ({ event, isOverdue }: EventCardProps) => {
           </View>
         </Pressable>
       </View>
-    </View>
+    </Pressable>
   );
 };

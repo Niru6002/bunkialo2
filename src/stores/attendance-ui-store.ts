@@ -50,7 +50,7 @@ interface AttendanceUIActions {
 }
 
 const initialState: AttendanceUIState = {
-  activeTab: "absences",
+  activeTab: "courses",
   showTooltip: false,
   isEditMode: false,
   showFabMenu: false,

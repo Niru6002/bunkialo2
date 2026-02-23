@@ -1,5 +1,5 @@
-import { AllBunksContent } from "@/components/attendance/sub_tabs/all-bunks-content";
 import { BunkTransferModal } from "@/components/attendance/bunk-transfer-modal";
+import { AllBunksContent } from "@/components/attendance/sub_tabs/all-bunks-content";
 import { CoursesContent } from "@/components/attendance/sub_tabs/courses-content";
 import { Container } from "@/components/ui/container";
 import { Colors } from "@/constants/theme";
@@ -10,8 +10,8 @@ import { useAttendanceUIStore } from "@/stores/attendance-ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { selectAllDutyLeaves, useBunkStore } from "@/stores/bunk-store";
 import {
-  computeUnknownCount,
-  formatSyncTime,
+    computeUnknownCount,
+    formatSyncTime,
 } from "@/utils/attendance-helpers";
 import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
@@ -142,7 +142,9 @@ export default function AttendanceScreen() {
 
   const isBunkTransferVisible = activeModal?.type === "bunk-transfer";
   const bunkTransferAllowImport =
-    activeModal?.type === "bunk-transfer" ? activeModal.allowImport !== false : true;
+    activeModal?.type === "bunk-transfer"
+      ? activeModal.allowImport !== false
+      : true;
 
   return (
     <Container>
@@ -246,6 +248,30 @@ export default function AttendanceScreen() {
           style={{ backgroundColor: theme.backgroundSecondary }}
         >
           <Pressable
+            onPress={() => handleTabChange("courses")}
+            className="flex-1 flex-row items-center justify-center gap-1 rounded-[8px] py-2"
+            style={
+              activeTab === "courses"
+                ? { backgroundColor: theme.background }
+                : undefined
+            }
+          >
+            <Ionicons
+              name="list"
+              size={16}
+              color={activeTab === "courses" ? theme.text : theme.textSecondary}
+            />
+            <Text
+              className="text-[13px] font-medium"
+              style={{
+                color:
+                  activeTab === "courses" ? theme.text : theme.textSecondary,
+              }}
+            >
+              Courses
+            </Text>
+          </Pressable>
+          <Pressable
             onPress={() => handleTabChange("absences")}
             className="flex-1 flex-row items-center justify-center gap-1 rounded-[8px] py-2"
             style={
@@ -269,30 +295,6 @@ export default function AttendanceScreen() {
               }}
             >
               All Bunks
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleTabChange("courses")}
-            className="flex-1 flex-row items-center justify-center gap-1 rounded-[8px] py-2"
-            style={
-              activeTab === "courses"
-                ? { backgroundColor: theme.background }
-                : undefined
-            }
-          >
-            <Ionicons
-              name="list"
-              size={16}
-              color={activeTab === "courses" ? theme.text : theme.textSecondary}
-            />
-            <Text
-              className="text-[13px] font-medium"
-              style={{
-                color:
-                  activeTab === "courses" ? theme.text : theme.textSecondary,
-              }}
-            >
-              Courses
             </Text>
           </Pressable>
         </View>
@@ -323,11 +325,11 @@ export default function AttendanceScreen() {
             color={isDark ? Colors.gray[200] : Colors.gray[700]}
             style={{ position: "absolute", right: 0, bottom: 80 }}
             backdropColor={isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.15)"}
-             fabStyle={{
-               backgroundColor: showFabMenu
-                 ? Colors.gray[800]
-                 : theme.backgroundSecondary,
-             }}
+            fabStyle={{
+              backgroundColor: showFabMenu
+                ? Colors.gray[800]
+                : theme.backgroundSecondary,
+            }}
             actions={
               activeTab === "absences"
                 ? [
@@ -337,7 +339,10 @@ export default function AttendanceScreen() {
                       color: theme.text,
                       style: { backgroundColor: theme.backgroundSecondary },
                       onPress: () =>
-                        openModal({ type: "bunk-transfer", scope: "duty-leave" }),
+                        openModal({
+                          type: "bunk-transfer",
+                          scope: "duty-leave",
+                        }),
                     },
                     {
                       icon: "calendar-sync-outline",
@@ -345,7 +350,10 @@ export default function AttendanceScreen() {
                       color: theme.text,
                       style: { backgroundColor: theme.backgroundSecondary },
                       onPress: () =>
-                        openModal({ type: "bunk-transfer", scope: "all-bunks" }),
+                        openModal({
+                          type: "bunk-transfer",
+                          scope: "all-bunks",
+                        }),
                     },
                   ]
                 : [
