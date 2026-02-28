@@ -2,23 +2,25 @@ import { Toast } from "@/components";
 import { Container } from "@/components/ui/container";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { downloadLmsResourceWithSession } from "@/services/lms-download";
 import { useAuthStore } from "@/stores/auth-store";
 import { useBunkStore } from "@/stores/bunk-store";
 import {
   LMS_RESOURCES_STALE_MS,
   useLmsResourcesStore,
 } from "@/stores/lms-resources-store";
-import { downloadLmsResourceWithSession } from "@/services/lms-download";
 import type { LmsDownloadProgress, LmsResourceItemNode } from "@/types";
 import { extractCourseName } from "@/utils/course-name";
 import { Ionicons } from "@expo/vector-icons";
+import { getContentUriAsync } from "expo-file-system/legacy";
+import { startActivityAsync } from "expo-intent-launcher";
 import { router, useLocalSearchParams } from "expo-router";
-import { isAvailableAsync, shareAsync } from "expo-sharing";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   InteractionManager,
   Linking,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -205,10 +207,12 @@ export default function CourseResourcesScreen() {
       }
 
       try {
-        const canShare = await isAvailableAsync();
-        if (canShare) {
-          await shareAsync(downloadResult.uri, {
-            dialogTitle: "Open downloaded file",
+        if (Platform.OS === "android") {
+          const contentUri = await getContentUriAsync(downloadResult.uri);
+          await startActivityAsync("android.intent.action.VIEW", {
+            data: contentUri,
+            type: downloadResult.contentType ?? "*/*",
+            flags: 1,
           });
         } else {
           await Linking.openURL(downloadResult.uri);
