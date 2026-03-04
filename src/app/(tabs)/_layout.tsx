@@ -1,27 +1,102 @@
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useDashboardStore } from "@/stores/dashboard-store";
 import { useGestureUiStore } from "@/stores/gesture-ui-store";
 import { Ionicons } from "@expo/vector-icons";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { withLayoutContext } from "expo-router";
-import { Text } from "react-native";
+import { startTransition, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, InteractionManager, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { Navigator } = createMaterialTopTabNavigator();
 const MaterialBottomTabs = withLayoutContext(Navigator);
+const PRIMARY_TAB_WARMUP_PRELOADERS = [
+  () => import("./timetable"),
+  () => import("./mess"),
+];
+const SECONDARY_TAB_WARMUP_PRELOADERS = [
+  () => import("./faculty"),
+  () => import("./attendance"),
+];
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const theme = isDark ? Colors.dark : Colors.light;
+  const hasDashboardHydrated = useDashboardStore((state) => state.hasHydrated);
+  const isDashboardLoading = useDashboardStore((state) => state.isLoading);
   const isHorizontalContentGestureActive = useGestureUiStore(
     (state) => state.isHorizontalContentGestureActive,
   );
+  const [lazyEnabled, setLazyEnabled] = useState(true);
+  const [lazyPreloadDistance, setLazyPreloadDistance] = useState(0);
+  const hasScheduledTabWarmup = useRef(false);
   const insets = useSafeAreaInsets();
   const tabLabelStyle = { fontSize: 12, lineHeight: 16 };
   const iconSize = 22;
   const tabBarContentHeight = iconSize + tabLabelStyle.lineHeight + 8;
   const tabBarHeight = tabBarContentHeight + insets.bottom;
+
+  useEffect(() => {
+    if (!hasDashboardHydrated || isDashboardLoading) return;
+    if (hasScheduledTabWarmup.current) return;
+    hasScheduledTabWarmup.current = true;
+
+    let primaryTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let secondaryTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let fullMountTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let secondaryTask: ReturnType<
+      typeof InteractionManager.runAfterInteractions
+    > | null = null;
+    let fullMountTask: ReturnType<
+      typeof InteractionManager.runAfterInteractions
+    > | null = null;
+
+    const primaryTask = InteractionManager.runAfterInteractions(() => {
+      primaryTimeoutId = setTimeout(() => {
+        setLazyPreloadDistance(1);
+        void Promise.allSettled(
+          PRIMARY_TAB_WARMUP_PRELOADERS.map((preloadRoute) => preloadRoute()),
+        );
+
+        secondaryTask = InteractionManager.runAfterInteractions(() => {
+          secondaryTimeoutId = setTimeout(() => {
+            setLazyPreloadDistance(2);
+            void Promise.allSettled(
+              SECONDARY_TAB_WARMUP_PRELOADERS.map((preloadRoute) =>
+                preloadRoute(),
+              ),
+            );
+          }, 300);
+        });
+
+        fullMountTask = InteractionManager.runAfterInteractions(() => {
+          fullMountTimeoutId = setTimeout(() => {
+            startTransition(() => {
+              setLazyPreloadDistance(4);
+              setLazyEnabled(false);
+            });
+          }, 900);
+        });
+      }, 450);
+    });
+
+    return () => {
+      primaryTask.cancel();
+      secondaryTask?.cancel();
+      fullMountTask?.cancel();
+      if (primaryTimeoutId) {
+        clearTimeout(primaryTimeoutId);
+      }
+      if (secondaryTimeoutId) {
+        clearTimeout(secondaryTimeoutId);
+      }
+      if (fullMountTimeoutId) {
+        clearTimeout(fullMountTimeoutId);
+      }
+    };
+  }, [hasDashboardHydrated, isDashboardLoading]);
 
   return (
     <MaterialBottomTabs
@@ -31,8 +106,17 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: theme.tabIconSelected,
         tabBarInactiveTintColor: theme.tabIconDefault,
-        lazy: true,
-        lazyPreloadDistance: 0,
+        lazy: lazyEnabled,
+        lazyPreloadDistance,
+        sceneStyle: { backgroundColor: theme.background },
+        lazyPlaceholder: () => (
+          <View
+            className="flex-1 items-center justify-center"
+            style={{ backgroundColor: theme.background }}
+          >
+            <ActivityIndicator size="small" color={theme.textSecondary} />
+          </View>
+        ),
         tabBarAllowFontScaling: false,
         tabBarLabel: ({ color, children }) => (
           <Text
