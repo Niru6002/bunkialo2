@@ -28,6 +28,7 @@ import { getContentUriAsync } from "expo-file-system/legacy";
 import { startActivityAsync } from "expo-intent-launcher";
 import { isAvailableAsync, shareAsync } from "expo-sharing";
 import { Platform } from "react-native";
+import { debug } from "@/utils/debug";
 
 const formatDateTime = (timestamp: number | null): string => {
   if (!timestamp) return "Not available";
@@ -377,11 +378,13 @@ const openExternal = async (url: string, preferredName: string) => {
     }
 
     Toast.show("Downloaded successfully", { type: "success" });
-  } catch {
+  } catch (error) {
+    debug.api("assignment resource open failed", error);
+
     Toast.show("Downloaded but could not open file", {
       type: "warning",
     });
-  } finally {
+  }finally {
     setDownloadingUrlSet((prev) => {
       const next = { ...prev };
       delete next[url];
