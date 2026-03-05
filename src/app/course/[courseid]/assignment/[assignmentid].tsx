@@ -384,7 +384,7 @@ const openExternal = async (url: string, preferredName: string) => {
     Toast.show("Downloaded but could not open file", {
       type: "warning",
     });
-  }finally {
+  } finally {
     setDownloadingUrlSet((prev) => {
       const next = { ...prev };
       delete next[url];
@@ -578,7 +578,7 @@ const openExternal = async (url: string, preferredName: string) => {
                 {details.resources.map((resource) => {
                   const preferredName =
                     resource.name?.trim() ||
-                    resource.url.split("/").pop()?.split("?")[0].split("#")[0] ||
+                    decodeURIComponent(resource.url.split("/").pop()?.split("?")[0].split("#")[0] || "")||
                     "assignment-resource";
 
                   const iconName = getFileIconName(preferredName);
