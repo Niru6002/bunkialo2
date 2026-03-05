@@ -578,7 +578,7 @@ const openExternal = async (url: string, preferredName: string) => {
                 {details.resources.map((resource) => {
                   const preferredName =
                     resource.name?.trim() ||
-                    resource.url.split("/").pop() ||
+                    resource.url.split("/").pop()?.split("?")[0].split("#")[0] ||
                     "assignment-resource";
 
                   const iconName = getFileIconName(preferredName);
