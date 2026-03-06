@@ -345,19 +345,18 @@ const openExternal = async (url: string, preferredName: string) => {
 
   setDownloadingUrlSet((prev) => ({ ...prev, [url]: true }));
 
-  const result = await downloadLmsResourceWithSession(url, preferredName);
-
-  if (!result.success) {
-    Toast.show(result.message || "Download failed", { type: "error" });
-    setDownloadingUrlSet((prev) => {
-      const next = { ...prev };
-      delete next[url];
-      return next;
-    });
-    return;
-  }
 
   try {
+      const result = await downloadLmsResourceWithSession(url, preferredName);
+      if (!result.success) {
+        Toast.show(result.message || "Download failed", { type: "error" });
+        setDownloadingUrlSet((prev) => {
+          const next = { ...prev };
+          delete next[url];
+          return next;
+        });
+        return;
+      }
     const mime = normalizeMimeType(result.contentType);
 
     if (Platform.OS === "android") {
