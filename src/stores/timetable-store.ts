@@ -144,7 +144,7 @@ const isOutlierCandidate = (
 ): boolean => {
   const totalWeeks = Math.max(totalWeekSpanCount, 1);
   const ratio = occurrenceCount / totalWeeks;
-  return occurrenceCount <= 1 || ratio < 0.34;
+  return ratio <= 0.34;
 };
 
 const recomputeWhenBaseStoresHydrated = (generateTimetable: () => void) => {
@@ -226,6 +226,44 @@ export const useTimetableStore = create<TimetableState & TimetableActions>()(
           }
 
           const chosenSlotKeys = new Set(selectedByRuleKeys);
+          const addOutlierConflict = (
+            alternative: (typeof inferred.candidates)[number],
+          ) => {
+            const outlierConflictId = buildOutlierConflictId(
+              course.courseId,
+              alternative.slotKey,
+            );
+            const resolvedOutlier = outlierResolutions[outlierConflictId];
+            const outlierStats: SlotOccurrenceStats = {
+              occurrenceCount: alternative.occurrenceCount,
+              dayActiveWeekCount: alternative.dayActiveWeekCount,
+              totalWeekSpanCount: alternative.totalWeekSpanCount,
+              dayObservationCount: alternative.dayObservationCount,
+              score: alternative.score,
+            };
+
+            outlierConflicts.push({
+              type: "outlier-review",
+              conflictId: outlierConflictId,
+              slot: {
+                id: generateId(),
+                courseId: course.courseId,
+                courseName: displayName,
+                dayOfWeek: alternative.dayOfWeek,
+                startTime: alternative.startTime,
+                endTime: alternative.endTime,
+                sessionType: alternative.sessionType,
+                isManual: false,
+                isCustomCourse: false,
+              },
+              stats: outlierStats,
+              resolvedChoice: resolvedOutlier ?? "ignore",
+            });
+
+            if (resolvedOutlier === "keep") {
+              chosenSlotKeys.add(alternative.slotKey);
+            }
+          };
 
           for (const [, dayCandidates] of candidatesByDay.entries()) {
             const selectedCandidates = dayCandidates.filter((c) =>
@@ -236,6 +274,16 @@ export const useTimetableStore = create<TimetableState & TimetableActions>()(
             );
 
             for (const alternative of alternativeCandidates) {
+              if (
+                isOutlierCandidate(
+                  alternative.occurrenceCount,
+                  alternative.totalWeekSpanCount,
+                )
+              ) {
+                addOutlierConflict(alternative);
+                continue;
+              }
+
               let nearest = selectedCandidates[0];
               let minDiff = Number.POSITIVE_INFINITY;
 
@@ -255,47 +303,7 @@ export const useTimetableStore = create<TimetableState & TimetableActions>()(
                 !nearest ||
                 minDiff > AUTO_SLOT_START_CONFLICT_WINDOW_MINUTES
               ) {
-                const outlierConflictId = buildOutlierConflictId(
-                  course.courseId,
-                  alternative.slotKey,
-                );
-                const resolvedOutlier = outlierResolutions[outlierConflictId];
-                const outlierStats: SlotOccurrenceStats = {
-                  occurrenceCount: alternative.occurrenceCount,
-                  dayActiveWeekCount: alternative.dayActiveWeekCount,
-                  totalWeekSpanCount: alternative.totalWeekSpanCount,
-                  dayObservationCount: alternative.dayObservationCount,
-                  score: alternative.score,
-                };
-                if (
-                  isOutlierCandidate(
-                    alternative.occurrenceCount,
-                    alternative.totalWeekSpanCount,
-                  )
-                ) {
-                  outlierConflicts.push({
-                    type: "outlier-review",
-                    conflictId: outlierConflictId,
-                    slot: {
-                      id: generateId(),
-                      courseId: course.courseId,
-                      courseName: displayName,
-                      dayOfWeek: alternative.dayOfWeek,
-                      startTime: alternative.startTime,
-                      endTime: alternative.endTime,
-                      sessionType: alternative.sessionType,
-                      isManual: false,
-                      isCustomCourse: false,
-                    },
-                    stats: outlierStats,
-                    resolvedChoice: resolvedOutlier ?? "ignore",
-                  });
-                  if (resolvedOutlier === "keep") {
-                    chosenSlotKeys.add(alternative.slotKey);
-                  }
-                } else {
-                  chosenSlotKeys.add(alternative.slotKey);
-                }
+                chosenSlotKeys.add(alternative.slotKey);
                 continue;
               }
 
