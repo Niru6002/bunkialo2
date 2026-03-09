@@ -7,14 +7,17 @@ import { getBaseUrl } from "@/services/baseurl";
 import { useAuthStore } from "@/stores/auth-store";
 import { filterPastBunks, selectCourseStats } from "@/stores/bunk-store";
 import type {
-    AttendanceRecord,
-    AttendanceStatus,
-    BunkRecord,
-    CourseAttendance,
-    CourseBunkData,
-    MarkedDates,
+  AttendanceRecord,
+  AttendanceStatus,
+  BunkRecord,
+  CourseAttendance,
+  CourseBunkData,
+  MarkedDates,
 } from "@/types";
-import { getRecordKeyVariants } from "@/utils/attendance-helpers";
+import {
+  filterCompletedAttendanceRecords,
+  getRecordKeyVariants,
+} from "@/utils/attendance-helpers";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Linking from "expo-linking";
@@ -58,7 +61,10 @@ const MONTH_TO_NUMBER: Record<string, string> = {
 
 type DayKey = string;
 
-const toDayKey = (raw: string, fallbackYear: number = new Date().getFullYear()): DayKey | null => {
+const toDayKey = (
+  raw: string,
+  fallbackYear: number = new Date().getFullYear(),
+): DayKey | null => {
   const cleaned = raw.trim();
   if (!cleaned) return null;
 
@@ -68,7 +74,9 @@ const toDayKey = (raw: string, fallbackYear: number = new Date().getFullYear()):
     return `${year}-${month}-${day}`;
   }
 
-  const dayMonthYearMatch = cleaned.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
+  const dayMonthYearMatch = cleaned.match(
+    /(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/,
+  );
   if (dayMonthYearMatch) {
     const [, day, monthRaw, year] = dayMonthYearMatch;
     const month = MONTH_TO_NUMBER[monthRaw.toLowerCase()];
@@ -92,42 +100,8 @@ const toDayKey = (raw: string, fallbackYear: number = new Date().getFullYear()):
   return `${year}-${month}-${day}`;
 };
 
-// parse "Thu 1 Jan 2026 11AM - 12PM" -> { date: "2026-01-01", time: "11AM - 12PM" }
-const parseDateString = (
-  dateStr: string,
-): { date: string | null; time: string | null } => {
-  const cleaned = dateStr.trim();
-  const timeMatch = cleaned.match(
-    /(\d{1,2}(?::\d{2})?(?:AM|PM)\s*-\s*\d{1,2}(?::\d{2})?(?:AM|PM))/i,
-  );
-  const time = timeMatch ? timeMatch[1] : null;
-
-  const dateMatch = cleaned.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
-  if (!dateMatch) return { date: null, time };
-
-  const [, day, monthStr, year] = dateMatch;
-  const month = MONTH_TO_NUMBER[monthStr.toLowerCase()];
-  if (!month) return { date: null, time };
-
-  return { date: `${year}-${month}-${day.padStart(2, "0")}`, time };
-};
-
 const parseBunkDateKey = (dateStr: string): string | null => {
   return toDayKey(dateStr);
-};
-
-// filter records up to current time only
-const filterPastRecords = (records: AttendanceRecord[]): AttendanceRecord[] => {
-  const now = new Date();
-  return records.filter((record) => {
-    const { date, time } = parseDateString(record.date);
-    if (!date) return false;
-    if (!time) return new Date(date) <= now;
-    const [, end] = time.split("-").map((part) => part.trim());
-    const dateTime = new Date(`${date} ${end}`);
-    if (Number.isNaN(dateTime.getTime())) return new Date(date) <= now;
-    return dateTime <= now;
-  });
 };
 
 // status to color
@@ -252,7 +226,7 @@ export function UnifiedCourseCard({
 
   // attendance stats (past only) - only for LMS courses
   const pastRecords = useMemo(
-    () => (course ? filterPastRecords(course.records) : []),
+    () => (course ? filterCompletedAttendanceRecords(course.records) : []),
     [course],
   );
   const totalSessions = pastRecords.length;
@@ -305,7 +279,10 @@ export function UnifiedCourseCard({
   );
   // Unknown ("?") defaults to present; DL and present corrections are treated as attended.
   const attended =
-    confirmedPresentCount + unknownCount + correctedPresentCount + dutyLeaveCount;
+    confirmedPresentCount +
+    unknownCount +
+    correctedPresentCount +
+    dutyLeaveCount;
   const percentage =
     totalSessions > 0 ? Math.round((attended / totalSessions) * 100) : 0;
   const percentageColor = getPercentageColor(percentage);

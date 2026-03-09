@@ -4,7 +4,10 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAttendanceStore } from "@/stores/attendance-store";
 import { useBunkStore } from "@/stores/bunk-store";
 import type { AttendanceRecord, MarkedDates } from "@/types";
-import { recordsReferToSameSession } from "@/utils/attendance-helpers";
+import {
+  isAttendanceRecordCompleted,
+  recordsReferToSameSession,
+} from "@/utils/attendance-helpers";
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { Text, View } from "react-native";
@@ -97,21 +100,21 @@ export function TotalAbsenceCalendar({
       for (const record of course.records) {
         // confirmed absences only
         if (record.status !== "Absent" && record.status !== "Unknown") continue;
-        const matchingBunk = bunkCourse?.bunks.find(
-          (b) => recordsReferToSameSession(b, record),
+        const matchingBunk = bunkCourse?.bunks.find((b) =>
+          recordsReferToSameSession(b, record),
         );
         // Unknown is assumed present unless user explicitly marked it
-        if (record.status === "Unknown" && (!matchingBunk || matchingBunk.isMarkedPresent)) {
+        if (
+          record.status === "Unknown" &&
+          (!matchingBunk || matchingBunk.isMarkedPresent)
+        ) {
           continue;
         }
 
         const { date, time } = parseDateString(record.date);
         if (!date) continue;
 
-        // today filter
-        const today = new Date();
-        today.setHours(23, 59, 59, 999);
-        if (new Date(date) > today) continue;
+        if (!isAttendanceRecordCompleted(record)) continue;
 
         if (!marked[date]) {
           marked[date] = { dots: [] };
@@ -170,7 +173,10 @@ export function TotalAbsenceCalendar({
         <Text className="text-[12px]" style={{ color: theme.textSecondary }}>
           Total Bunks
         </Text>
-        <Text className="text-[32px] font-bold" style={{ color: Colors.status.danger }}>
+        <Text
+          className="text-[32px] font-bold"
+          style={{ color: Colors.status.danger }}
+        >
           {totalAbsences}
         </Text>
       </View>
@@ -203,15 +209,24 @@ export function TotalAbsenceCalendar({
 
       {/* selected date absences - swipeable */}
       {selectedDate && selectedAbsences.length > 0 && (
-        <View className="mt-4 border-t pt-4" style={{ borderTopColor: theme.border }}>
-          <Text className="mb-1 text-[14px] font-semibold" style={{ color: theme.text }}>
+        <View
+          className="mt-4 border-t pt-4"
+          style={{ borderTopColor: theme.border }}
+        >
+          <Text
+            className="mb-1 text-[14px] font-semibold"
+            style={{ color: theme.text }}
+          >
             {new Date(selectedDate).toLocaleDateString("en-US", {
               weekday: "short",
               month: "short",
               day: "numeric",
             })}
           </Text>
-          <Text className="mb-2 text-[10px] opacity-60" style={{ color: theme.textSecondary }}>
+          <Text
+            className="mb-2 text-[10px] opacity-60"
+            style={{ color: theme.textSecondary }}
+          >
             Swipe left = Present · Swipe right = DL/Absent
           </Text>
           <ScrollView

@@ -8,7 +8,9 @@ import type {
 } from "@/types";
 import {
   buildRecordKey,
+  filterCompletedAttendanceRecords,
   getRecordKeyVariants,
+  parseTimeSlot,
 } from "@/utils/attendance-helpers";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -45,43 +47,6 @@ const formatDate = (dateStr: string): string => {
   const match = dateStr.match(/(\w{3})\s+(\d{1,2})\s+(\w{3})/);
   if (match) return `${match[2]} ${match[3]}`;
   return dateStr.slice(0, 15);
-};
-
-// parse time
-const parseTime = (dateStr: string): string | null => {
-  const timeMatch = dateStr.match(
-    /(\d{1,2}(?::\d{2})?(?:AM|PM)\s*-\s*\d{1,2}(?::\d{2})?(?:AM|PM))/i,
-  );
-  return timeMatch ? timeMatch[1] : null;
-};
-
-// filter past records
-const filterPast = (records: AttendanceRecord[]): AttendanceRecord[] => {
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
-  return records.filter((r) => {
-    const dateMatch = r.date.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
-    if (!dateMatch) return false;
-    const months: Record<string, string> = {
-      jan: "01",
-      feb: "02",
-      mar: "03",
-      apr: "04",
-      may: "05",
-      jun: "06",
-      jul: "07",
-      aug: "08",
-      sep: "09",
-      oct: "10",
-      nov: "11",
-      dec: "12",
-    };
-    const [, day, monthStr, year] = dateMatch;
-    const month = months[monthStr.toLowerCase()];
-    if (!month) return false;
-    const date = new Date(`${year}-${month}-${day.padStart(2, "0")}`);
-    return date <= today;
-  });
 };
 
 export function UnknownStatusModal({
@@ -131,7 +96,7 @@ export function UnknownStatusModal({
   const baseUnknownEntries = useMemo((): UnknownEntry[] => {
     const entries: UnknownEntry[] = [];
     for (const course of courses) {
-      const pastRecords = filterPast(course.records);
+      const pastRecords = filterCompletedAttendanceRecords(course.records);
       for (const record of pastRecords) {
         if (record.status === "Unknown") {
           const matchingBunk = getRecordKeyVariants(record)
@@ -284,7 +249,7 @@ export function UnknownStatusModal({
   };
 
   const renderItem = ({ item }: { item: UnknownEntry }) => {
-    const time = parseTime(item.record.date);
+    const time = parseTimeSlot(item.record.date);
     const resolutionMeta = getResolutionMeta(item.resolution);
     const entryKey = getUnknownEntryKey(item.courseId, item.record);
     const isPending = pendingByKey[entryKey] === true;

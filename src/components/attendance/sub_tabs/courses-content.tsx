@@ -12,12 +12,11 @@ import {
   selectAllDutyLeaves,
   useBunkStore,
 } from "@/stores/bunk-store";
-import type {
-  AttendanceRecord,
-  CourseAttendance,
-  CourseBunkData,
-} from "@/types";
-import { getRecordKeyVariants } from "@/utils/attendance-helpers";
+import type { CourseAttendance, CourseBunkData } from "@/types";
+import {
+  filterCompletedAttendanceRecords,
+  getRecordKeyVariants,
+} from "@/utils/attendance-helpers";
 import { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
@@ -36,60 +35,13 @@ import { PresenceInputModal } from "../presence-input-modal";
 import { UnifiedCourseCard } from "../unified-course-card";
 import { UnknownStatusModal } from "../unknown-status-modal";
 
-const parseDateString = (
-  dateStr: string,
-): { date: string | null; time: string | null } => {
-  const cleaned = dateStr.trim();
-  const timeMatch = cleaned.match(
-    /(\d{1,2}(?::\d{2})?(?:AM|PM)\s*-\s*\d{1,2}(?::\d{2})?(?:AM|PM))/i,
-  );
-  const time = timeMatch ? timeMatch[1] : null;
-
-  const dateMatch = cleaned.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
-  if (!dateMatch) return { date: null, time };
-
-  const [, day, monthStr, year] = dateMatch;
-  const months: Record<string, string> = {
-    jan: "01",
-    feb: "02",
-    mar: "03",
-    apr: "04",
-    may: "05",
-    jun: "06",
-    jul: "07",
-    aug: "08",
-    sep: "09",
-    oct: "10",
-    nov: "11",
-    dec: "12",
-  };
-  const month = months[monthStr.toLowerCase()];
-  if (!month) return { date: null, time };
-
-  return { date: `${year}-${month}-${day.padStart(2, "0")}`, time };
-};
-
-const filterPastRecords = (records: AttendanceRecord[]): AttendanceRecord[] => {
-  const now = new Date();
-  return records.filter((record) => {
-    const { date, time } = parseDateString(record.date);
-    if (!date) return false;
-    if (!time) return new Date(date) <= now;
-
-    const [, end] = time.split("-").map((part) => part.trim());
-    const dateTime = new Date(`${date} ${end}`);
-    if (Number.isNaN(dateTime.getTime())) return new Date(date) <= now;
-    return dateTime <= now;
-  });
-};
-
 const getEffectiveCoursePercentage = (
   course: CourseAttendance | null,
   bunkData: CourseBunkData | undefined,
 ): number => {
   if (!course) return Number.POSITIVE_INFINITY;
 
-  const pastRecords = filterPastRecords(course.records);
+  const pastRecords = filterCompletedAttendanceRecords(course.records);
   const totalSessions = pastRecords.length;
   if (totalSessions === 0) return 0;
 

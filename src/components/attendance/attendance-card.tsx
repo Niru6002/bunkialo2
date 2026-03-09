@@ -4,13 +4,14 @@ import { CalendarTheme, Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useBunkStore } from "@/stores/bunk-store";
 import type {
-    AttendanceRecord,
-    AttendanceStatus,
-    BunkRecord,
-    CourseAttendance,
-    MarkedDates,
-    SessionType,
+  AttendanceRecord,
+  AttendanceStatus,
+  BunkRecord,
+  CourseAttendance,
+  MarkedDates,
+  SessionType,
 } from "@/types";
+import { filterCompletedAttendanceRecords } from "@/utils/attendance-helpers";
 import { extractCourseName } from "@/utils/course-name";
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
@@ -109,52 +110,6 @@ const parseDateString = (
   };
 };
 
-const parseTimeToMinutes = (timeStr: string): number | null => {
-  const match = timeStr.trim().match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/i);
-  if (!match) return null;
-
-  const [, hourStr, minuteStr, meridiem] = match;
-  const hour12 = parseInt(hourStr, 10);
-  const minutes = minuteStr ? parseInt(minuteStr, 10) : 0;
-  if (hour12 < 1 || hour12 > 12 || minutes < 0 || minutes > 59) return null;
-
-  let hour24 = hour12 % 12;
-  if (meridiem.toUpperCase() === "PM") hour24 += 12;
-  return hour24 * 60 + minutes;
-};
-
-const getSessionEndDateTime = (
-  date: string,
-  time: string | null,
-): Date | null => {
-  const baseDate = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(baseDate.getTime())) return null;
-  if (!time) return baseDate;
-
-  const [, endPartRaw] = time.split("-").map((part) => part.trim());
-  if (!endPartRaw) return baseDate;
-
-  const endMinutes = parseTimeToMinutes(endPartRaw);
-  if (endMinutes === null) return baseDate;
-
-  const endDate = new Date(baseDate);
-  endDate.setHours(Math.floor(endMinutes / 60), endMinutes % 60, 0, 0);
-  return endDate;
-};
-
-// filter records up to current time only
-const filterPastRecords = (records: AttendanceRecord[]): AttendanceRecord[] => {
-  const now = new Date();
-
-  return records.filter((record) => {
-    const { date, time } = parseDateString(record.date);
-    if (!date) return false;
-    const sessionEnd = getSessionEndDateTime(date, time);
-    if (!sessionEnd) return false;
-    return sessionEnd <= now;
-  });
-};
-
 // status to color
 const getStatusColor = (status: AttendanceStatus): string => {
   switch (status) {
@@ -243,7 +198,7 @@ export function AttendanceCard({
 
   // filter to past sessions only
   const pastRecords = useMemo(
-    () => filterPastRecords(course.records),
+    () => filterCompletedAttendanceRecords(course.records),
     [course.records],
   );
   const totalSessions = pastRecords.length;
