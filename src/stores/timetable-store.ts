@@ -225,7 +225,7 @@ export const useTimetableStore = create<TimetableState & TimetableActions>()(
             }
           }
 
-          const chosenSlotKeys = new Set(selectedByRuleKeys);
+          const chosenSlotKeys = new Set<string>();
           const addOutlierConflict = (
             alternative: (typeof inferred.candidates)[number],
           ) => {
@@ -265,9 +265,27 @@ export const useTimetableStore = create<TimetableState & TimetableActions>()(
             }
           };
 
+          for (const slotKey of selectedByRuleKeys) {
+            const candidate = candidateBySlotKey.get(slotKey);
+            if (!candidate) continue;
+
+            if (
+              isOutlierCandidate(
+                candidate.occurrenceCount,
+                candidate.totalWeekSpanCount,
+              )
+            ) {
+              addOutlierConflict(candidate);
+              continue;
+            }
+
+            chosenSlotKeys.add(slotKey);
+          }
+
           for (const [, dayCandidates] of candidatesByDay.entries()) {
             const selectedCandidates = dayCandidates.filter((c) =>
-              selectedByRuleKeys.has(c.slotKey),
+              selectedByRuleKeys.has(c.slotKey) &&
+              chosenSlotKeys.has(c.slotKey),
             );
             const alternativeCandidates = dayCandidates.filter(
               (c) => !selectedByRuleKeys.has(c.slotKey),
